@@ -1,3 +1,5 @@
+import { ApiError } from "./client";
+
 const ERROR_MESSAGES: Record<string, string> = {
   LOGIN_FAILED: "Tên đăng nhập hoặc mật khẩu không chính xác.",
   INVALID_CREDENTIALS: "Tên đăng nhập hoặc mật khẩu không chính xác.",
@@ -13,6 +15,12 @@ const ERROR_MESSAGES: Record<string, string> = {
 
 const DEFAULT_ERROR_MESSAGE = "Đã có lỗi xảy ra. Vui lòng thử lại.";
 
-export function getErrorMessage(code: string): string {
-  return ERROR_MESSAGES[code] ?? DEFAULT_ERROR_MESSAGE;
+export const ErrorMessage = {
+  getMessage(code: string, fallback?: string): string {
+    return ERROR_MESSAGES[code] ?? fallback ?? DEFAULT_ERROR_MESSAGE;
+  },
+};
+
+export function getErrorCode(error: unknown, fallback: string): string {
+  return error instanceof ApiError ? error.code : fallback;
 }

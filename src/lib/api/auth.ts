@@ -10,6 +10,7 @@ export interface LoginResult {
 export const loginApi = async (
   username: string,
   password: string,
+  tenant?: string,
 ): Promise<LoginResult> => {
   const url = requireEnv(
     "NEXT_PUBLIC_API_LOGIN",
@@ -17,7 +18,7 @@ export const loginApi = async (
   );
   const response = await postJson<{ data: LoginResult }>(
     url,
-    { username, password, tenant: getTenant() },
+    { username, password},
     { fallbackErrorCode: "LOGIN_FAILED" },
   );
   return response.data;
@@ -115,6 +116,47 @@ export const otpResetVerifyApi = async (otp: string): Promise<boolean> => {
     {
       authorization: `Bearer ${accessToken}`,
       fallbackErrorCode: "OTP_VERIFY_FAILED",
+    },
+  );
+  return response.data;
+};
+
+export const verifyTokenApi = async (): Promise<boolean> => {
+  const accessToken = localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+  if (!accessToken) return false;
+  const url = requireEnv(
+    "NEXT_PUBLIC_API_VERIFY_TOKEN",
+    process.env.NEXT_PUBLIC_API_VERIFY_TOKEN,
+  );
+  try {
+    const response = await fetch(url, {
+      method: "GET",
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+};
+
+export const refreshTokenApi = async (): Promise<{
+  accessToken: string;
+  refreshToken: string;
+}> => {
+  const refreshToken = localStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
+  if (!refreshToken) throw new ApiError("UNAUTHORIZED", 401);
+  const url = requireEnv(
+    "NEXT_PUBLIC_API_REFRESH_TOKEN",
+    process.env.NEXT_PUBLIC_API_REFRESH_TOKEN,
+  );
+  const response = await postJson<{
+    data: { accessToken: string; refreshToken: string };
+  }>(
+    url,
+    { refreshToken },
+    {
+      authorization: `Bearer ${refreshToken}`,
+      fallbackErrorCode: "UNAUTHORIZED",
     },
   );
   return response.data;

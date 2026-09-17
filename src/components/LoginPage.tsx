@@ -13,11 +13,10 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { type SyntheticEvent, useState } from "react";
 import { loginApi } from "@/lib/api/auth";
-import { ApiError } from "@/lib/api/client";
-import { getErrorMessage } from "@/lib/api/errors";
+import { ErrorMessage, getErrorCode } from "@/lib/api/errors";
 import { STORAGE_KEYS } from "@/lib/storage";
 import { useNotification } from "@/providers/NotificationProvider";
 
@@ -25,7 +24,8 @@ const MIN_LENGTH = 6;
 
 export default function LoginPage() {
   const router = useRouter();
-  const { notify } = useNotification();
+  const searchParams = useSearchParams();
+  const { notifySuccess, notifyError } = useNotification();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [usernameError, setUsernameError] = useState("");
@@ -74,12 +74,18 @@ export default function LoginPage() {
         password,
       );
       localStorage.setItem(STORAGE_KEYS.OTP_TOKEN, otpToken);
+      notifySuccess("Đăng nhập thành công");
       router.push(
         requiredGenerateOTP ? "/auth/qr/generator" : "/auth/qr/verify",
       );
     } catch (error) {
-      const code = error instanceof ApiError ? error.code : "LOGIN_FAILED";
-      notify(getErrorMessage(code), "error");
+      const code = getErrorCode(error, "LOGIN_FAILED");
+      notifyError(
+        ErrorMessage.getMessage(
+          code,
+          "Tài khoản đăng nhập hoặc mật khẩu không đúng",
+        ),
+      );
       setLoading(false);
     }
   };

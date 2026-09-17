@@ -7,7 +7,7 @@ import { AuthPageShell } from "@/components/auth/AuthPageShell";
 import { CodeVerification } from "@/components/qr/CodeVerification";
 import { otpLoginApi } from "@/lib/api/auth";
 import { ApiError } from "@/lib/api/client";
-import { getErrorMessage } from "@/lib/api/errors";
+import { ErrorMessage, getErrorCode } from "@/lib/api/errors";
 import { getRoleHomeRoute } from "@/lib/roles";
 import { STORAGE_KEYS } from "@/lib/storage";
 import { useNotification } from "@/providers/NotificationProvider";
@@ -72,16 +72,15 @@ export function QrVerifyView() {
       notify("Xác thực thành công!", "success");
       router.push(getRoleHomeRoute(result.roles));
     } catch (error) {
-      const errorCode =
-        error instanceof ApiError ? error.code : "OTP_LOGIN_FAILED";
+      const errorCode = getErrorCode(error, "OTP_LOGIN_FAILED");
       const status = error instanceof ApiError ? error.status : undefined;
 
       if (status === 401 || errorCode === "OTP_TOKEN_MISSING") {
-        lockOut(getErrorMessage(errorCode));
+        lockOut(ErrorMessage.getMessage(errorCode));
         return;
       }
       if (errorCode === "OTP_RATE_LIMITED") {
-        lockOut(getErrorMessage(errorCode));
+        lockOut(ErrorMessage.getMessage(errorCode));
         return;
       }
 
@@ -92,7 +91,7 @@ export function QrVerifyView() {
         return;
       }
       setAttemptError(
-        `${getErrorMessage(errorCode)} (còn ${MAX_ATTEMPTS - nextAttempts} lần thử)`,
+        `${ErrorMessage.getMessage(errorCode)} (còn ${MAX_ATTEMPTS - nextAttempts} lần thử)`,
       );
     } finally {
       setIsSubmitting(false);

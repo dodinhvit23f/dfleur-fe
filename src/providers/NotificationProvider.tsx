@@ -30,6 +30,8 @@ type NotificationContextValue = {
     severity?: Severity,
     options?: NotificationOptions,
   ) => void;
+  notifySuccess: (message: string, options?: NotificationOptions) => void;
+  notifyError: (message: string, options?: NotificationOptions) => void;
 };
 
 const DEFAULT_AUTO_HIDE_DURATION = 4000;
@@ -76,6 +78,18 @@ export default function NotificationProvider({
     [],
   );
 
+  const notifySuccess = useCallback(
+    (message: string, options?: NotificationOptions) =>
+      notify(message, "success", options),
+    [notify],
+  );
+
+  const notifyError = useCallback(
+    (message: string, options?: NotificationOptions) =>
+      notify(message, "error", options),
+    [notify],
+  );
+
   useEffect(() => {
     if (queue.length > 0 && !current) {
       setCurrent(queue[0]);
@@ -96,7 +110,9 @@ export default function NotificationProvider({
   };
 
   return (
-    <NotificationContext.Provider value={{ notify }}>
+    <NotificationContext.Provider
+      value={{ notify, notifySuccess, notifyError }}
+    >
       {children}
       <Snackbar
         key={current?.key}

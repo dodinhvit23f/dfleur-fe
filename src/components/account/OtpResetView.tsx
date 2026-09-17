@@ -7,7 +7,7 @@ import { AuthPageShell } from "@/components/auth/AuthPageShell";
 import { QRGenerator } from "@/components/qr/QRGenerator";
 import { otpResetGenerateApi, otpResetVerifyApi } from "@/lib/api/auth";
 import { ApiError } from "@/lib/api/client";
-import { getErrorMessage } from "@/lib/api/errors";
+import { ErrorMessage, getErrorCode } from "@/lib/api/errors";
 import { getRoleHomeRoute } from "@/lib/roles";
 import { clearSession, readStoredRoles, STORAGE_KEYS } from "@/lib/storage";
 import { useNotification } from "@/providers/NotificationProvider";
@@ -27,9 +27,8 @@ export function OtpResetView() {
     otpResetGenerateApi()
       .then(setQrData)
       .catch((error) => {
-        const code =
-          error instanceof ApiError ? error.code : "OTP_GENERATE_FAILED";
-        notify(getErrorMessage(code), "error");
+        const code = getErrorCode(error, "OTP_GENERATE_FAILED");
+        notify(ErrorMessage.getMessage(code), "error");
         if (error instanceof ApiError && error.status === 401) {
           clearSession();
           router.replace("/");
@@ -44,14 +43,14 @@ export function OtpResetView() {
       notify("Đặt lại 2FA thành công", "success");
       router.push(getRoleHomeRoute(readStoredRoles()));
     } catch (error) {
-      const code = error instanceof ApiError ? error.code : "OTP_VERIFY_FAILED";
+      const code = getErrorCode(error, "OTP_VERIFY_FAILED");
       if (error instanceof ApiError && error.status === 401) {
         clearSession();
-        notify(getErrorMessage(code), "error");
+        notify(ErrorMessage.getMessage(code), "error");
         router.replace("/");
         return;
       }
-      notify(getErrorMessage(code), "error");
+      notify(ErrorMessage.getMessage(code), "error");
       throw error;
     }
   };
