@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { QrVerifyView } from "@/components/auth/QrVerifyView";
 
 export const metadata: Metadata = {
-  title: "Xác thực 2 lớp — dFleur",
+  title: "Xác thực 2 lớp — D'Fluer",
   description: "Nhập mã OTP từ ứng dụng xác thực để hoàn tất đăng nhập",
 };
 

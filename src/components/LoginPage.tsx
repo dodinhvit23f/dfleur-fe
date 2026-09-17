@@ -133,7 +133,7 @@ export default function LoginPage() {
       >
         <Stack spacing={0.5} sx={{ alignItems: "center", mb: 3 }}>
           <Typography variant="h4" color="primary.main">
-            DFleur
+            D'Fluer
           </Typography>
           <Typography variant="body2" color="text.secondary">
             Welcome back — sign in to continue

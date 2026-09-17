@@ -31,8 +31,8 @@ const playfairDisplay = Playfair_Display({
 });
 
 export const metadata: Metadata = {
-  title: "DFleur",
-  description: "DFleur — sign in to your account",
+  title: "D'Fluer",
+  description: "D'Fluer — sign in to your account",
 };
 
 export default function RootLayout({
