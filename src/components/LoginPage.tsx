@@ -13,17 +13,18 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+import { useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
+import { loginApi } from "@/lib/api/auth";
+import { ApiError } from "@/lib/api/client";
+import { getErrorMessage } from "@/lib/api/errors";
+import { STORAGE_KEYS } from "@/lib/storage";
 import { useNotification } from "@/providers/NotificationProvider";
-
-const DUMMY_CREDENTIALS = {
-  username: "adminuser",
-  password: "password123",
-};
 
 const MIN_LENGTH = 6;
 
 export default function LoginPage() {
+  const router = useRouter();
   const { notify } = useNotification();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -61,28 +62,26 @@ export default function LoginPage() {
   const isFormValid =
     username.trim().length >= MIN_LENGTH && password.length >= MIN_LENGTH;
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    if (!validate()) {
-      notify("Invalid email or password", "error");
-      return;
-    }
+    if (!validate()) return;
 
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      const success =
-        username === DUMMY_CREDENTIALS.username &&
-        password === DUMMY_CREDENTIALS.password;
-
-      notify(
-        success
-          ? "Login successful! Redirecting..."
-          : "Invalid email or password",
-        success ? "success" : "error",
+    try {
+      const { otpToken, requiredGenerateOTP } = await loginApi(
+        username,
+        password,
       );
-    }, 1500);
+      localStorage.setItem(STORAGE_KEYS.OTP_TOKEN, otpToken);
+      router.push(
+        requiredGenerateOTP ? "/auth/qr/generator" : "/auth/qr/verify",
+      );
+    } catch (error) {
+      const code = error instanceof ApiError ? error.code : "LOGIN_FAILED";
+      notify(getErrorMessage(code), "error");
+      setLoading(false);
+    }
   };
 
   return (

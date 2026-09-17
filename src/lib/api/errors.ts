@@ -1,0 +1,18 @@
+const ERROR_MESSAGES: Record<string, string> = {
+  LOGIN_FAILED: "Tên đăng nhập hoặc mật khẩu không chính xác.",
+  INVALID_CREDENTIALS: "Tên đăng nhập hoặc mật khẩu không chính xác.",
+  OTP_TOKEN_MISSING: "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+  OTP_GENERATE_FAILED: "Không thể tạo mã QR. Vui lòng thử lại.",
+  OTP_VERIFY_FAILED: "Mã OTP không chính xác. Vui lòng thử lại.",
+  OTP_LOGIN_FAILED: "Mã OTP không chính xác. Vui lòng thử lại.",
+  OTP_INVALID: "Mã OTP không chính xác. Vui lòng thử lại.",
+  OTP_EXPIRED: "Mã OTP đã hết hạn. Vui lòng đăng nhập lại.",
+  OTP_RATE_LIMITED: "Bạn đã nhập sai quá nhiều lần. Vui lòng thử lại sau.",
+  UNAUTHORIZED: "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+};
+
+const DEFAULT_ERROR_MESSAGE = "Đã có lỗi xảy ra. Vui lòng thử lại.";
+
+export function getErrorMessage(code: string): string {
+  return ERROR_MESSAGES[code] ?? DEFAULT_ERROR_MESSAGE;
+}
