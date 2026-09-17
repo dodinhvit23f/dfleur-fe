@@ -41,13 +41,13 @@ export function QrGeneratorView() {
     try {
       await otpVerifyApi(otp);
       notify("Xác thực OTP thành công", "success");
-      router.push("/");
+      router.push("/auth/login");
     } catch (error) {
       const code = getErrorCode(error, "OTP_VERIFY_FAILED");
       if (error instanceof ApiError && error.status === 401) {
         localStorage.removeItem(STORAGE_KEYS.OTP_TOKEN);
         notify(ErrorMessage.getMessage(code), "error");
-        router.replace("/");
+        router.replace("/auth/login");
         return;
       }
       notify(ErrorMessage.getMessage(code), "error");
