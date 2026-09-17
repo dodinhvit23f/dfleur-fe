@@ -14,7 +14,7 @@ import {
   Typography,
 } from "@mui/material";
 import { useRouter } from "next/navigation";
-import { type FormEvent, useState } from "react";
+import { type SyntheticEvent, useState } from "react";
 import { loginApi } from "@/lib/api/auth";
 import { ApiError } from "@/lib/api/client";
 import { getErrorMessage } from "@/lib/api/errors";
@@ -62,7 +62,7 @@ export default function LoginPage() {
   const isFormValid =
     username.trim().length >= MIN_LENGTH && password.length >= MIN_LENGTH;
 
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: SyntheticEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     if (!validate()) return;
