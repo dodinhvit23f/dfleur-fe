@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { isStaleOrderError } from "@/lib/api/orders";
-import { uploadSampleFile } from "@/lib/api/upload";
+import { uploadSampleFiles } from "@/lib/api/upload";
 import { useApiErrorHandler } from "@/lib/api/useApiErrorHandler";
 import { useNotification } from "@/providers/NotificationProvider";
 import {
@@ -108,21 +108,16 @@ export function useOrderForm({
 
   const dismissConflicts = useCallback(() => setConflicts([]), []);
 
-  // Only new Files are uploaded; existing URLs pass through. The result keeps
-  // the order of `images`.
+  // Only new Files are uploaded (concurrently, joined before this resolves);
+  // existing URLs pass through. The result keeps the order of `images`.
   const uploadImages = async (images: OrderImage[]): Promise<string[]> => {
     const files = images.filter(
       (image): image is File => image instanceof File,
     );
-    const pending = files.filter((file) => !uploadedRef.current.has(file));
-    let done = 0;
-    setProgress({ done, total: pending.length });
-    for (const file of pending) {
-      const url = await uploadSampleFile(file);
-      uploadedRef.current.set(file, url);
-      done += 1;
-      setProgress({ done, total: pending.length });
-    }
+    await uploadSampleFiles(files, {
+      cache: uploadedRef.current,
+      onProgress: (done, total) => setProgress({ done, total }),
+    });
     return images.map((image) =>
       image instanceof File
         ? (uploadedRef.current.get(image) as string)
