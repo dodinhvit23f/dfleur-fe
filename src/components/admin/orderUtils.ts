@@ -163,6 +163,38 @@ export function formatOrderTimeRange(start: string, end: string): string {
   return `${startLabel} - ${endLabel}`;
 }
 
+export interface DeliveryWindow {
+  /** True when start and end fall on the same calendar day (or one is unparseable). */
+  sameDay: boolean;
+  startDate: string;
+  endDate: string;
+  startTime: string;
+  endTime: string;
+}
+
+/** Start/end date and time labels for the table's delivery cells. */
+export function getDeliveryWindow(start: string, end: string): DeliveryWindow {
+  const startDate = parseOrderDate(start);
+  const endDate = parseOrderDate(end);
+  const startValid = !Number.isNaN(startDate.getTime());
+  const endValid = !Number.isNaN(endDate.getTime());
+  const time = (date: Date, valid: boolean) =>
+    valid ? `${pad(date.getHours())}:${pad(date.getMinutes())}` : "—";
+  const sameDay =
+    !startValid ||
+    !endValid ||
+    (startDate.getFullYear() === endDate.getFullYear() &&
+      startDate.getMonth() === endDate.getMonth() &&
+      startDate.getDate() === endDate.getDate());
+  return {
+    sameDay,
+    startDate: formatOrderDate(start),
+    endDate: formatOrderDate(end),
+    startTime: time(startDate, startValid),
+    endTime: time(endDate, endValid),
+  };
+}
+
 const vndFormatter = new Intl.NumberFormat("vi-VN", {
   style: "currency",
   currency: "VND",

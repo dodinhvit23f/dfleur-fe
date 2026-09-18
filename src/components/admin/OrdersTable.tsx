@@ -35,6 +35,7 @@ import {
   formatOrderDate,
   formatOrderTimeRange,
   formatVnd,
+  getDeliveryWindow,
   getExtraCustomerContact,
   getStatusType,
   hasSamplePicture,
@@ -113,6 +114,26 @@ function OrdersGridFooter() {
         {`Page ${Math.min(page + 1, Math.max(pageCount, 1))} of ${Math.max(pageCount, 1)} (Total ${rowCount} records)`}
       </Typography>
       <GridPagination />
+    </Box>
+  );
+}
+
+// Same-day windows render as one plain line; a window that spans days adds a
+// secondary "→ end" line under the start value.
+function renderDeliveryCell(value: string, end: string | null) {
+  if (end === null) {
+    return <Typography variant="body2">{value}</Typography>;
+  }
+  return (
+    <Box sx={{ py: 0.5 }}>
+      <Typography variant="body2">{value}</Typography>
+      <Typography
+        variant="caption"
+        color="text.secondary"
+        sx={{ display: "block" }}
+      >
+        → {end}
+      </Typography>
     </Box>
   );
 }
@@ -286,8 +307,18 @@ export function OrdersTable({
       {
         field: "deliveryDate",
         headerName: "Ngày Giao",
-        width: 130,
+        width: 140,
         valueGetter: (_value, row) => formatOrderDate(row.deliveryDateStart),
+        renderCell: (params) => {
+          const span = getDeliveryWindow(
+            params.row.deliveryDateStart,
+            params.row.deliveryDateEnd,
+          );
+          return renderDeliveryCell(
+            params.value,
+            span.sameDay ? null : span.endDate,
+          );
+        },
       },
       {
         field: "deliveryTime",
@@ -295,6 +326,15 @@ export function OrdersTable({
         width: 130,
         valueGetter: (_value, row) =>
           formatOrderTimeRange(row.deliveryDateStart, row.deliveryDateEnd),
+        renderCell: (params) => {
+          const span = getDeliveryWindow(
+            params.row.deliveryDateStart,
+            params.row.deliveryDateEnd,
+          );
+          return span.sameDay
+            ? renderDeliveryCell(params.value, null)
+            : renderDeliveryCell(span.startTime, span.endTime);
+        },
       },
       {
         field: "deliveryAddress",
