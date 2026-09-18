@@ -20,11 +20,8 @@ import {
   type OrdersFilterState,
 } from "./orderUtils";
 import { SliceImages } from "./SliceImages";
-import { useDebouncedValue } from "./useDebouncedValue";
 import { useOrders } from "./useOrders";
 import { useStaffOptions } from "./useStaffOptions";
-
-const SEARCH_DEBOUNCE_MS = 400;
 
 export function OrdersView() {
   const { notify } = useNotification();
@@ -50,16 +47,11 @@ export function OrdersView() {
     string[]
   >([]);
 
-  const debouncedSearch = useDebouncedValue(
-    filters.search.trim(),
-    SEARCH_DEBOUNCE_MS,
-  );
-
   const params = useMemo<OrderListParams>(
     () => ({
       page: paginationModel.page,
       size: paginationModel.pageSize,
-      search: debouncedSearch,
+      search: filters.search.trim(),
       startDate: filters.deliveryStart,
       endDate: filters.deliveryEnd,
       statuses: filters.statuses,
@@ -68,7 +60,7 @@ export function OrdersView() {
     }),
     [
       paginationModel,
-      debouncedSearch,
+      filters.search,
       filters.deliveryStart,
       filters.deliveryEnd,
       filters.statuses,
@@ -118,8 +110,8 @@ export function OrdersView() {
           floristOptions={floristOptions}
           filters={filters}
           onFiltersChange={handleFiltersChange}
-          onExport={() => notify("Export to Excel started", "info")}
-          onPrint={() => notify("Preparing orders for print", "info")}
+          onExport={() => notify("Đang xuất Excel", "info")}
+          onPrint={() => notify("Đang chuẩn bị in", "info")}
           onNewOrder={() => setCreateOpen(true)}
         />
         <OrdersTable

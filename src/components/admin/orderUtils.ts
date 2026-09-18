@@ -329,6 +329,29 @@ export function hasActiveOrdersFilters(filters: OrdersFilterState): boolean {
   );
 }
 
+function sameDate(a: Date | null, b: Date | null): boolean {
+  if (a === null || b === null) return a === b;
+  return a.getTime() === b.getTime();
+}
+
+function sameList(a: readonly string[], b: readonly string[]): boolean {
+  return a.length === b.length && a.every((value, index) => value === b[index]);
+}
+
+export function areOrdersFiltersEqual(
+  a: OrdersFilterState,
+  b: OrdersFilterState,
+): boolean {
+  return (
+    a.search.trim() === b.search.trim() &&
+    sameDate(a.deliveryStart, b.deliveryStart) &&
+    sameDate(a.deliveryEnd, b.deliveryEnd) &&
+    sameList(a.statuses, b.statuses) &&
+    sameList(a.salers, b.salers) &&
+    sameList(a.florists, b.florists)
+  );
+}
+
 /** Inverse of `parseOrderDate`: emits the backend's "DD-MM-YYYYTHH:mm:ss+07:00". */
 export function formatOrderDateString(date: Date): string {
   return `${pad(date.getDate())}-${pad(date.getMonth() + 1)}-${date.getFullYear()}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}+07:00`;
