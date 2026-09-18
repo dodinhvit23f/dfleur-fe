@@ -51,6 +51,12 @@ export interface Order {
   status: OrderStatus;
 }
 
+/** What the backend accepts on create — it assigns orderCode, status and version. */
+export type CreateOrderPayload = Omit<
+  Order,
+  "orderCode" | "status" | "version"
+>;
+
 export interface OrdersApiResponse {
   traceId: string;
   data: {
@@ -203,72 +209,233 @@ export function hasActiveOrdersFilters(filters: OrdersFilterState): boolean {
   );
 }
 
-function startOfDay(date: Date): Date {
-  const copy = new Date(date);
-  copy.setHours(0, 0, 0, 0);
-  return copy;
+/** Inverse of `parseOrderDate`: emits the backend's "DD-MM-YYYYTHH:mm:ss+07:00". */
+export function formatOrderDateString(date: Date): string {
+  return `${pad(date.getDate())}-${pad(date.getMonth() + 1)}-${date.getFullYear()}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}+07:00`;
 }
 
-function endOfDay(date: Date): Date {
-  const copy = new Date(date);
-  copy.setHours(23, 59, 59, 999);
-  return copy;
+// ---------------------------------------------------------------------------
+// Create-order form
+// ---------------------------------------------------------------------------
+
+export const CUSTOMER_SOURCE_OPTIONS: { label: string; value: string }[] = [
+  { label: "Facebook", value: "FACEBOOK" },
+  { label: "Instagram", value: "INSTAGRAM" },
+  { label: "Zalo", value: "ZALO" },
+  { label: "Tiktok", value: "TIKTOK" },
+  { label: "Telegram", value: "TELEGRAM" },
+  { label: "Hotline", value: "HOTLINE" },
+  { label: "Cửa Hàng", value: "REGULAR_CUSTOMER" },
+  { label: "Nhân Viên", value: "CUSTOMER" },
+  { label: "Bắn Đơn", value: "EMAIL" },
+  { label: "Khác", value: "OTHER" },
+];
+
+export const DELIVERY_FEE_OPTIONS: {
+  value: number;
+  label: string;
+  hint: string;
+}[] = [
+  {
+    value: 0,
+    label: "Cửa hàng trả",
+    hint: "Phí ship sẽ được thêm vào bảng chi tiêu của cửa hàng",
+  },
+  {
+    value: 1,
+    label: "Khách trả",
+    hint: "Phí ship do khách trả, cửa hàng không phát sinh chi tiêu cho việc này",
+  },
+  {
+    value: 2,
+    label: "Khách trả tính VAT",
+    hint: "Phí ship do khách trả, tính gộp vào VAT, cửa hàng không phát sinh chi tiêu cho việc này",
+  },
+];
+
+export const VAT_OPTIONS = [0, 5, 8] as const;
+
+export const ORDER_IMAGE_LIMITS = {
+  maxFiles: 10,
+  maxSizeMb: 4,
+  acceptedTypes: ["image/jpeg", "image/png", "image/webp"],
+} as const;
+
+export interface OrderFormValues {
+  customerName: string;
+  customerPhone: string;
+  socialLink: string;
+  customerSource: string;
+  deliveryAddress: string;
+  receiverName: string;
+  receiverPhone: string;
+  deliveryDateStart: Date;
+  deliveryDateEnd: Date;
+  /** Minutes before deliveryDateStart the order should be finished. */
+  estimateStartMinutes: string;
+  saleAccount: string;
+  floristAccount: string;
+  /** Money inputs are held as raw digit strings ("1500000"). */
+  actualPrice: string;
+  discount: string;
+  deliveryFee: string;
+  deposit: string;
+  deliveryFeeOption: number;
+  vatFeeOption: number;
+  orderDescription: string;
+  customerRemark: string;
+  bannerContent: string;
+  images: File[];
 }
 
-export function filterOrders(
-  orders: Order[],
-  filters: OrdersFilterState,
-): Order[] {
-  const search = filters.search.trim().toLowerCase();
-  const rangeStart = filters.deliveryStart
-    ? startOfDay(filters.deliveryStart).getTime()
-    : null;
-  const rangeEnd = filters.deliveryEnd
-    ? endOfDay(filters.deliveryEnd).getTime()
-    : null;
+export function createEmptyOrderFormValues(): OrderFormValues {
+  const now = new Date();
+  return {
+    customerName: "",
+    customerPhone: "",
+    socialLink: "",
+    customerSource: "FACEBOOK",
+    deliveryAddress: "",
+    receiverName: "",
+    receiverPhone: "",
+    deliveryDateStart: now,
+    deliveryDateEnd: now,
+    estimateStartMinutes: "",
+    saleAccount: "",
+    floristAccount: "",
+    actualPrice: "",
+    discount: "",
+    deliveryFee: "",
+    deposit: "",
+    deliveryFeeOption: 0,
+    vatFeeOption: 0,
+    orderDescription: "",
+    customerRemark: "",
+    bannerContent: "",
+    images: [],
+  };
+}
 
-  return orders.filter((order) => {
-    if (search) {
-      const haystack = [
-        order.orderCode,
-        order.customerName,
-        order.receiverName,
-        order.customerPhone,
-        order.receiverPhone,
-      ]
-        .join(" ")
-        .toLowerCase();
-      if (!haystack.includes(search)) return false;
-    }
+export function toDigits(input: string): string {
+  return input.replace(/\D/g, "");
+}
 
-    if (
-      filters.statuses.length > 0 &&
-      !filters.statuses.includes(order.status)
-    ) {
-      return false;
-    }
+export function parseMoney(raw: string): number {
+  const digits = toDigits(raw);
+  return digits === "" ? 0 : Number(digits);
+}
 
-    if (
-      filters.salers.length > 0 &&
-      !filters.salers.includes(order.saleAccount)
-    ) {
-      return false;
-    }
+const numberFormatter = new Intl.NumberFormat("vi-VN");
 
-    if (
-      filters.florists.length > 0 &&
-      !filters.florists.includes(order.floristAccount ?? "")
-    ) {
-      return false;
-    }
+/** "1500000" -> "1.500.000" for display inside a text input. */
+export function formatMoneyInput(raw: string): string {
+  const digits = toDigits(raw);
+  return digits === "" ? "" : numberFormatter.format(Number(digits));
+}
 
-    if (rangeStart !== null || rangeEnd !== null) {
-      const deliveryTime = parseOrderDate(order.deliveryDateStart).getTime();
-      if (Number.isNaN(deliveryTime)) return false;
-      if (rangeStart !== null && deliveryTime < rangeStart) return false;
-      if (rangeEnd !== null && deliveryTime > rangeEnd) return false;
-    }
+export interface OrderTotals {
+  vatFee: number;
+  salePrice: number;
+  totalAmount: number;
+  remainingAmount: number;
+}
 
-    return true;
-  });
+/**
+ * Same rules as the florist-fe order form: delivery fee is added to the total
+ * only when the customer pays it (option 1/2), and is VAT-able only for
+ * option 2; VAT is a percentage of the sale price (+ delivery fee for option 2).
+ */
+export function computeOrderTotals(values: OrderFormValues): OrderTotals {
+  const listPrice = parseMoney(values.actualPrice);
+  const deliveryFee = parseMoney(values.deliveryFee);
+  const discount = parseMoney(values.discount);
+  const deposit = parseMoney(values.deposit);
+  const { deliveryFeeOption, vatFeeOption } = values;
+
+  const salePrice = listPrice - discount;
+  let totalAmount = salePrice;
+  let vatFee = (salePrice * vatFeeOption) / 100;
+
+  if (deliveryFeeOption === 1 || deliveryFeeOption === 2) {
+    totalAmount += deliveryFee;
+  }
+  if (deliveryFeeOption === 2) {
+    vatFee += (deliveryFee * vatFeeOption) / 100;
+  }
+  totalAmount += vatFee;
+
+  return {
+    vatFee,
+    salePrice,
+    totalAmount,
+    remainingAmount: totalAmount - deposit,
+  };
+}
+
+/** Returns the first validation message (Vietnamese, user-facing) or null. */
+export function validateOrder(values: OrderFormValues): string | null {
+  if (values.customerName.trim() === "") return "Chưa nhập tên khách hàng";
+  if (values.customerPhone.trim() === "") {
+    return "Chưa nhập số điện thoại khách hàng";
+  }
+  if (toDigits(values.actualPrice) === "") return "Chưa nhập giá niêm yết";
+  if (values.deliveryAddress.trim() === "")
+    return "Chưa nhập địa chỉ giao hàng";
+  if (values.images.length === 0) return "Thiếu file ảnh mẫu";
+  if (values.saleAccount.trim() === "") {
+    return "Nhân viên sale không được để rỗng";
+  }
+  const source = values.customerSource.toLowerCase();
+  if (
+    (source === "facebook" || source === "instagram") &&
+    values.socialLink.trim() === ""
+  ) {
+    return "Facebook, Instagram không được để rỗng mạng xã hội";
+  }
+  if (values.deliveryDateStart.getTime() > values.deliveryDateEnd.getTime()) {
+    return "Ngày bắt đầu không thể muộn hơn ngày kết thúc";
+  }
+  return null;
+}
+
+export function buildOrder(
+  values: OrderFormValues,
+  samplePictureLink: string[],
+): CreateOrderPayload {
+  const totals = computeOrderTotals(values);
+  const estimateMinutes = parseMoney(values.estimateStartMinutes);
+  const floristAccount = values.floristAccount.trim();
+
+  return {
+    customerName: values.customerName.trim(),
+    deliveryAddress: values.deliveryAddress.trim(),
+    customerPhone: values.customerPhone.trim(),
+    socialLink: values.socialLink.trim() || "none",
+    deliveryDateStart: formatOrderDateString(values.deliveryDateStart),
+    deliveryDateEnd: formatOrderDateString(values.deliveryDateEnd),
+    ...(estimateMinutes > 0 && {
+      estimateStart: formatOrderDateString(
+        new Date(values.deliveryDateStart.getTime() - estimateMinutes * 60_000),
+      ),
+    }),
+    customerSource: values.customerSource,
+    receiverName: values.receiverName.trim(),
+    receiverPhone: values.receiverPhone.trim(),
+    samplePictureLink,
+    orderDescription: values.orderDescription.trim(),
+    customerRemark: values.customerRemark.trim(),
+    bannerContent: values.bannerContent.trim(),
+    actualPrice: parseMoney(values.actualPrice),
+    deliveryFee: parseMoney(values.deliveryFee),
+    deliveryFeeOption: values.deliveryFeeOption,
+    discountAmount: parseMoney(values.discount),
+    vatFee: totals.vatFee,
+    vatFeeOption: values.vatFeeOption,
+    salePrice: totals.salePrice,
+    remainingAmount: totals.remainingAmount,
+    depositAmount: parseMoney(values.deposit),
+    totalAmount: totals.totalAmount,
+    saleAccount: values.saleAccount.trim(),
+    ...(floristAccount !== "" && { floristAccount }),
+  };
 }

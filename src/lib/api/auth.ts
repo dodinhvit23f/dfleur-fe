@@ -30,7 +30,7 @@ function requireOtpToken(): string {
   return token;
 }
 
-function requireAccessToken(): string {
+export function requireAccessToken(): string {
   const token = localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
   if (!token) throw new ApiError("UNAUTHORIZED", 401);
   return token;

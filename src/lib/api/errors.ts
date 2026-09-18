@@ -11,6 +11,11 @@ const ERROR_MESSAGES: Record<string, string> = {
   OTP_EXPIRED: "Mã OTP đã hết hạn. Vui lòng đăng nhập lại.",
   OTP_RATE_LIMITED: "Bạn đã nhập sai quá nhiều lần. Vui lòng thử lại sau.",
   UNAUTHORIZED: "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+  ORDER_LIST_FAILED: "Không thể tải danh sách đơn hàng. Vui lòng thử lại.",
+  ORDER_STATUS_FAILED: "Cập nhật trạng thái đơn thất bại.",
+  ORDER_CREATE_FAILED: "Tạo đơn hàng thất bại. Vui lòng thử lại.",
+  UPLOAD_FAILED: "Tải ảnh lên thất bại. Vui lòng thử lại.",
+  UPLOAD_FILE_REJECTED: "File không phù hợp.",
 };
 
 const DEFAULT_ERROR_MESSAGE = "Đã có lỗi xảy ra. Vui lòng thử lại.";

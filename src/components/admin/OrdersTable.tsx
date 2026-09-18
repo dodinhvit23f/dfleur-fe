@@ -21,6 +21,7 @@ import {
   type GridColDef,
   type GridFilterInputValueProps,
   GridPagination,
+  type GridPaginationModel,
   gridPageCountSelector,
   gridRowCountSelector,
   useGridApiContext,
@@ -28,8 +29,6 @@ import {
 } from "@mui/x-data-grid";
 import type { MouseEvent } from "react";
 import { useCallback, useMemo, useState } from "react";
-import { useNotification } from "@/providers/NotificationProvider";
-import { defaultOrders } from "./mockData";
 import {
   compareOrderStatus,
   formatOrderDate,
@@ -47,8 +46,14 @@ import { StatusChangeMenu } from "./StatusChangeMenu";
 import { StatusChip } from "./StatusChip";
 
 export interface OrdersTableProps {
-  orders?: Order[];
+  orders: Order[];
+  /** Total rows across all pages (server-side pagination). */
+  rowCount: number;
+  paginationModel: GridPaginationModel;
+  onPaginationModelChange: (model: GridPaginationModel) => void;
+  loading?: boolean;
   onImageClick: (links: string[]) => void;
+  onStatusChange: (order: Order, status: OrderStatus) => void;
 }
 
 const STICKY_COLUMN_OFFSETS: Record<string, number> = {
@@ -111,11 +116,15 @@ function OrdersGridFooter() {
 }
 
 export function OrdersTable({
-  orders = defaultOrders,
+  orders,
+  rowCount,
+  paginationModel,
+  onPaginationModelChange,
+  loading = false,
   onImageClick,
+  onStatusChange,
 }: OrdersTableProps) {
   const theme = useTheme();
-  const { notify } = useNotification();
 
   const codeToIndex = useMemo(() => {
     const map = new Map<string, number>();
@@ -136,12 +145,12 @@ export function OrdersTable({
     [],
   );
 
-  const handleStatusSelect = (newStatus: OrderStatus) => {
-    notify(`Đổi trạng thái đơn hàng sang "${trans(newStatus)}" (demo)`, "info");
-  };
-
   const activeOrder =
     activeIndex !== null && activeIndex !== -1 ? orders[activeIndex] : null;
+
+  const handleStatusSelect = (newStatus: OrderStatus) => {
+    if (activeOrder) onStatusChange(activeOrder, newStatus);
+  };
 
   const columns: GridColDef<Order>[] = useMemo(
     () => [
@@ -359,9 +368,11 @@ export function OrdersTable({
         getRowHeight={() => "auto"}
         getEstimatedRowHeight={() => 80}
         pageSizeOptions={[50, 100]}
-        initialState={{
-          pagination: { paginationModel: { pageSize: 50, page: 0 } },
-        }}
+        paginationMode="server"
+        rowCount={rowCount}
+        paginationModel={paginationModel}
+        onPaginationModelChange={onPaginationModelChange}
+        loading={loading}
         autoHeight
         disableVirtualization
         slots={{ footer: OrdersGridFooter }}
