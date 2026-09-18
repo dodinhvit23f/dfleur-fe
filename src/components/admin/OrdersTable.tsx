@@ -48,6 +48,14 @@ export interface OrdersTableProps {
   orders?: Order[];
 }
 
+const STICKY_COLUMN_OFFSETS: Record<string, number> = {
+  __check__: 0,
+  status: 50,
+  image: 200,
+  orderCode: 290,
+};
+const LAST_STICKY_FIELD = "orderCode";
+
 function StatusFilterInput({ item, applyValue }: GridFilterInputValueProps) {
   const value: OrderStatus[] = item.value ?? [];
 
@@ -170,8 +178,8 @@ export function OrdersTable({ orders = defaultOrders }: OrdersTableProps) {
       },
       {
         field: "image",
-        headerName: "Image",
-        width: 64,
+        headerName: "Sản Phẩm",
+        width: 90,
         sortable: false,
         filterable: false,
         renderCell: (params) => (
@@ -184,42 +192,82 @@ export function OrdersTable({ orders = defaultOrders }: OrdersTableProps) {
           </Avatar>
         ),
       },
-      { field: "orderCode", headerName: "Order Code", width: 180 },
+      { field: "orderCode", headerName: "Mã Đơn", width: 180 },
       {
         field: "orderDescription",
-        headerName: "Order Describe",
-        flex: 1,
-        minWidth: 200,
-        valueGetter: (_value, row) => row.orderDescription ?? "—",
+        headerName: "Thông Tin Đơn",
+        flex: 1.4,
+        minWidth: 260,
+        sortable: false,
+        filterable: false,
+        renderCell: (params) => {
+          const lines: { label: string; value?: string }[] = [
+            { label: "Order", value: params.row.orderDescription },
+            { label: "Remark", value: params.row.customerRemark },
+            { label: "Banner", value: params.row.bannerContent },
+          ];
+          return (
+            <Box
+              sx={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 0.25,
+                width: "100%",
+                py: 1,
+              }}
+            >
+              {lines.map(({ label, value }) => (
+                <Box key={label} sx={{ display: "flex", gap: 0.5 }}>
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ flexShrink: 0 }}
+                  >
+                    {label}:
+                  </Typography>
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      whiteSpace: "normal",
+                      wordBreak: "break-word",
+                    }}
+                  >
+                    {value ?? "—"}
+                  </Typography>
+                </Box>
+              ))}
+            </Box>
+          );
+        },
       },
       {
         field: "salePrice",
-        headerName: "Sale Price",
+        headerName: "Giá Niêm Yết",
         width: 130,
         valueFormatter: (value: number) => formatVnd(value),
       },
       {
         field: "deliveryDate",
-        headerName: "Delivery Date",
+        headerName: "Ngày Giao",
         width: 130,
         valueGetter: (_value, row) => formatOrderDate(row.deliveryDateStart),
       },
       {
         field: "deliveryTime",
-        headerName: "Delivery Time",
+        headerName: "Giờ Giao",
         width: 130,
         valueGetter: (_value, row) =>
           formatOrderTimeRange(row.deliveryDateStart, row.deliveryDateEnd),
       },
       {
         field: "deliveryAddress",
-        headerName: "Delivery Address",
+        headerName: "Địa Chỉ Giao",
         flex: 1,
         minWidth: 220,
       },
       {
         field: "receiver",
-        headerName: "Receiver",
+        headerName: "Người Nhận",
         width: 200,
         valueGetter: (_value, row) =>
           `${row.receiverName} · ${row.receiverPhone}`,
@@ -231,14 +279,14 @@ export function OrdersTable({ orders = defaultOrders }: OrdersTableProps) {
       },
       {
         field: "floristAccount",
-        headerName: "Florist",
+        headerName: "Thợ Hoa",
         width: 130,
         valueGetter: (_value, row) => row.floristAccount ?? "—",
       },
       {
         field: "socialLink",
-        headerName: "Social",
-        width: 70,
+        headerName: "Mạng Xã Hội",
+        width: 90,
         sortable: false,
         filterable: false,
         renderCell: (params) => {
@@ -281,11 +329,15 @@ export function OrdersTable({ orders = defaultOrders }: OrdersTableProps) {
         checkboxSelection
         disableRowSelectionOnClick
         density="compact"
+        columnHeaderHeight={72}
+        getRowHeight={() => "auto"}
+        getEstimatedRowHeight={() => 80}
         pageSizeOptions={[50, 100]}
         initialState={{
           pagination: { paginationModel: { pageSize: 50, page: 0 } },
         }}
         autoHeight
+        disableVirtualization
         slots={{ footer: OrdersGridFooter }}
         sx={{
           border: "none",
@@ -295,7 +347,72 @@ export function OrdersTable({ orders = defaultOrders }: OrdersTableProps) {
             zIndex: 1,
             bgcolor: theme.palette.background.default,
             borderBottom: `1px solid ${alpha(theme.palette.text.secondary, 0.2)}`,
+            boxShadow: `0 4px 6px -2px ${alpha(theme.palette.text.primary, 0.08)}`,
           },
+          "& .MuiDataGrid-columnHeaderTitleContainer": {
+            whiteSpace: "normal",
+            overflow: "visible",
+          },
+          "& .MuiDataGrid-columnHeaderTitleContainerContent": {
+            minWidth: 0,
+            overflow: "visible",
+            whiteSpace: "normal",
+          },
+          "& .MuiDataGrid-columnHeaderTitle": {
+            whiteSpace: "normal",
+            overflow: "visible",
+            textOverflow: "unset",
+            lineHeight: 1.3,
+            wordBreak: "break-word",
+          },
+          ...Object.fromEntries(
+            Object.entries(STICKY_COLUMN_OFFSETS).flatMap(([field, left]) => {
+              const isLast = field === LAST_STICKY_FIELD;
+              const edgeShadow = isLast
+                ? {
+                    boxShadow: `4px 0 8px ${alpha(theme.palette.text.primary, 0.08)}`,
+                  }
+                : {};
+              return [
+                [
+                  `& .MuiDataGrid-cell[data-field="${field}"]`,
+                  {
+                    position: "sticky",
+                    left,
+                    zIndex: 2,
+                    bgcolor: theme.palette.background.paper,
+                    ...edgeShadow,
+                  },
+                ],
+                [
+                  `& .MuiDataGrid-columnHeader[data-field="${field}"]`,
+                  {
+                    position: "sticky",
+                    left,
+                    zIndex: 3,
+                    bgcolor: theme.palette.background.default,
+                    ...edgeShadow,
+                  },
+                ],
+                [
+                  `& .MuiDataGrid-row:hover .MuiDataGrid-cell[data-field="${field}"]`,
+                  {
+                    // action.hover/selected are semi-transparent; layering them as a
+                    // gradient on top of the opaque bgcolor (rather than replacing it)
+                    // keeps the sticky cell fully opaque so scrolled content underneath
+                    // can't bleed through on hover/selection.
+                    backgroundImage: `linear-gradient(${theme.palette.action.hover}, ${theme.palette.action.hover})`,
+                  },
+                ],
+                [
+                  `& .MuiDataGrid-row.Mui-selected .MuiDataGrid-cell[data-field="${field}"]`,
+                  {
+                    backgroundImage: `linear-gradient(${theme.palette.action.selected}, ${theme.palette.action.selected})`,
+                  },
+                ],
+              ];
+            }),
+          ),
         }}
       />
       <StatusChangeMenu

@@ -5,8 +5,8 @@ import type { Order, OrderStatus } from "./orderUtils";
 import type { RevenueSeriesPoint } from "./RevenueLineChart";
 
 export const defaultNavItems: NavItem[] = [
-  { label: "Home", href: "/admin", icon: "home" },
-  { label: "Orders", href: "/admin/orders", icon: "cart" },
+  { label: "Trang Chủ", href: "/admin", icon: "home" },
+  { label: "Đơn Hàng", href: "/admin/orders", icon: "cart" },
 ];
 
 export const defaultFinancialMetrics: FinancialMetric[] = [

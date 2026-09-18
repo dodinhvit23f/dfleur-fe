@@ -3,8 +3,8 @@ import { Suspense } from "react";
 import LoginPage from "@/components/LoginPage";
 
 export const metadata: Metadata = {
-  title: "Login — D'Fluer",
-  description: "Sign in to your D'Fluer account",
+  title: "Đăng nhập — D'Fluer",
+  description: "Đăng nhập vào tài khoản D'Fluer của bạn",
 };
 
 export default function Page() {

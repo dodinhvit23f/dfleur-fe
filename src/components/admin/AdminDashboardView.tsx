@@ -8,7 +8,7 @@ import { RevenueLineChart } from "./RevenueLineChart";
 
 export function AdminDashboardView() {
   return (
-    <AdminLayout title="Home Dashboard">
+    <AdminLayout title="Trang Chủ">
       <Stack spacing={3}>
         <FinancialOverviewCard />
         <Box
