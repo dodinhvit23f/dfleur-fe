@@ -170,6 +170,10 @@ export function hasSocialLink(socialLink: string | undefined): boolean {
   return Boolean(socialLink) && socialLink !== "None";
 }
 
+export function hasSamplePicture(links: string[] | undefined): boolean {
+  return Boolean(links && links.length > 0 && links[0] && links[0] !== "null");
+}
+
 export interface OrdersFilterState {
   search: string;
   deliveryStart: Date | null;

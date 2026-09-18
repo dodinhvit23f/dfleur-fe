@@ -4,6 +4,7 @@ import LaunchRoundedIcon from "@mui/icons-material/LaunchRounded";
 import {
   Avatar,
   Box,
+  Button,
   Checkbox,
   FormControl,
   IconButton,
@@ -35,6 +36,7 @@ import {
   formatOrderTimeRange,
   formatVnd,
   getStatusType,
+  hasSamplePicture,
   hasSocialLink,
   ORDER_STATUS_VALUES,
   type Order,
@@ -46,13 +48,14 @@ import { StatusChip } from "./StatusChip";
 
 export interface OrdersTableProps {
   orders?: Order[];
+  onImageClick: (links: string[]) => void;
 }
 
 const STICKY_COLUMN_OFFSETS: Record<string, number> = {
   __check__: 0,
   status: 50,
-  image: 200,
-  orderCode: 290,
+  samplePictureLink: 200,
+  orderCode: 310,
 };
 const LAST_STICKY_FIELD = "orderCode";
 
@@ -107,7 +110,10 @@ function OrdersGridFooter() {
   );
 }
 
-export function OrdersTable({ orders = defaultOrders }: OrdersTableProps) {
+export function OrdersTable({
+  orders = defaultOrders,
+  onImageClick,
+}: OrdersTableProps) {
   const theme = useTheme();
   const { notify } = useNotification();
 
@@ -177,20 +183,40 @@ export function OrdersTable({ orders = defaultOrders }: OrdersTableProps) {
         ),
       },
       {
-        field: "image",
+        field: "samplePictureLink",
         headerName: "Sản Phẩm",
-        width: 90,
+        width: 110,
         sortable: false,
         filterable: false,
-        renderCell: (params) => (
-          <Avatar
-            src={params.row.samplePictureLink[0]}
-            variant="rounded"
-            sx={{ width: 40, height: 40 }}
-          >
-            {params.row.customerName.charAt(0)}
-          </Avatar>
-        ),
+        renderCell: (params) => {
+          const links = params.value as string[];
+          if (!hasSamplePicture(links)) return null;
+          return (
+            <Box sx={{ display: "flex", alignItems: "center", height: "100%" }}>
+              <Button
+                size="small"
+                variant="text"
+                sx={{
+                  p: 0,
+                  minWidth: 0,
+                  fontSize: "0.7rem",
+                  gap: 0.5,
+                  textTransform: "none",
+                }}
+                onClick={() => onImageClick(links)}
+              >
+                <Avatar
+                  src={links[0]}
+                  variant="rounded"
+                  sx={{ width: 40, height: 40 }}
+                >
+                  {params.row.customerName.charAt(0)}
+                </Avatar>
+                {`+${links.length} ảnh`}
+              </Button>
+            </Box>
+          );
+        },
       },
       { field: "orderCode", headerName: "Mã Đơn", width: 180 },
       {
@@ -310,7 +336,7 @@ export function OrdersTable({ orders = defaultOrders }: OrdersTableProps) {
         },
       },
     ],
-    [codeToIndex, handleStatusClick],
+    [codeToIndex, handleStatusClick, onImageClick],
   );
 
   return (
