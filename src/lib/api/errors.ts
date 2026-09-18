@@ -14,6 +14,10 @@ const ERROR_MESSAGES: Record<string, string> = {
   ORDER_LIST_FAILED: "Không thể tải danh sách đơn hàng. Vui lòng thử lại.",
   ORDER_STATUS_FAILED: "Cập nhật trạng thái đơn thất bại.",
   ORDER_CREATE_FAILED: "Tạo đơn hàng thất bại. Vui lòng thử lại.",
+  ORDER_DETAIL_FAILED: "Không thể tải đơn hàng. Vui lòng thử lại.",
+  ORDER_NOT_FOUND: "Không tìm thấy đơn hàng.",
+  ORDER_UPDATE_FAILED: "Cập nhật đơn hàng thất bại. Vui lòng thử lại.",
+  ORDER_BUSY: "Đơn hàng đang được cập nhật, vui lòng thử lại sau giây lát.",
   UPLOAD_FAILED: "Tải ảnh lên thất bại. Vui lòng thử lại.",
   UPLOAD_FILE_REJECTED: "File không phù hợp.",
 };

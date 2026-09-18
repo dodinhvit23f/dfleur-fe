@@ -3,6 +3,7 @@ import type {
   Order,
   OrderStatus,
   OrdersApiResponse,
+  UpdateOrderPayload,
 } from "@/components/admin/orderUtils";
 import { requireAccessToken } from "./auth";
 import { ApiError, getJson, postJson, putJson, requireEnv } from "./client";
@@ -137,6 +138,42 @@ export const createOrderApi = async (
     fallbackErrorCode: "ORDER_CREATE_FAILED",
   });
   return normalizeOrder(response.data);
+};
+
+/** Loads one order (fresh `version` included) for the edit form. */
+export const getOrderDetail = async (code: string): Promise<Order> => {
+  const url = requireEnv(
+    "NEXT_PUBLIC_API_ADMIN_ORDER_DETAIL",
+    process.env.NEXT_PUBLIC_API_ADMIN_ORDER_DETAIL,
+  );
+  const response = await getJson<{ data?: Order }>(
+    `${url}/${encodeURIComponent(code)}`,
+    { authorization: bearer(), fallbackErrorCode: "ORDER_DETAIL_FAILED" },
+  );
+  if (!response.data?.orderCode) throw new ApiError("ORDER_NOT_FOUND", 404);
+  return normalizeOrder(response.data);
+};
+
+/**
+ * Saves an edited order. Optimistic lock: `payload.version` must be the one that
+ * was loaded — a mismatch is rejected (see `isStaleOrderError`). Resolves to the
+ * order as saved: the response's copy, or the payload itself when the response
+ * carries no usable order.
+ */
+export const updateOrderApi = async (
+  payload: UpdateOrderPayload,
+): Promise<Order> => {
+  const url = requireEnv(
+    "NEXT_PUBLIC_API_ADMIN_ORDER_UPDATE",
+    process.env.NEXT_PUBLIC_API_ADMIN_ORDER_UPDATE,
+  );
+  const response = await putJson<{ data?: Order }>(
+    url,
+    { ...payload, status: toApiStatus(payload.status) },
+    { authorization: bearer(), fallbackErrorCode: "ORDER_UPDATE_FAILED" },
+  );
+  const { editor: _editor, ...sent } = payload;
+  return normalizeOrder(response?.data?.orderCode ? response.data : sent);
 };
 
 export const updateOrderStatusApi = async (

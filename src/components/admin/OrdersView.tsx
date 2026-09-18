@@ -14,6 +14,8 @@ import { OrderForm } from "./OrderForm";
 import { OrderFormModal } from "./OrderFormModal";
 import { OrdersFilterToolbar } from "./OrdersFilterToolbar";
 import { OrdersTable } from "./OrdersTable";
+import { OrderUpdateModal } from "./OrderUpdateModal";
+import { createEmptyOrderFormValues } from "./orderForm";
 import {
   type CreateOrderPayload,
   emptyOrdersFilterState,
@@ -34,6 +36,8 @@ export function OrdersView() {
     fetchOrders,
     refresh,
     addOrder,
+    syncOrder,
+    saveOrder,
     changeStatus,
   } = useOrders();
   const [filters, setFilters] = useState(emptyOrdersFilterState);
@@ -42,6 +46,15 @@ export function OrdersView() {
     pageSize: 50,
   });
   const [createOpen, setCreateOpen] = useState(false);
+  const [createInitial, setCreateInitial] = useState(
+    createEmptyOrderFormValues,
+  );
+  const [createDirty, setCreateDirty] = useState(false);
+  // `code` stays set while the edit modal animates closed.
+  const [editing, setEditing] = useState<{
+    code: string | null;
+    open: boolean;
+  }>({ code: null, open: false });
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [samplePictureFilePreview, setSamplePictureFilePreview] = useState<
     string[]
@@ -122,7 +135,10 @@ export function OrdersView() {
           onFiltersChange={handleFiltersChange}
           onExport={() => notify("Đang xuất Excel", "info")}
           onPrint={() => notify("Đang chuẩn bị in", "info")}
-          onNewOrder={() => setCreateOpen(true)}
+          onNewOrder={() => {
+            setCreateInitial(createEmptyOrderFormValues());
+            setCreateOpen(true);
+          }}
         />
         <OrdersTable
           orders={orders}
@@ -132,6 +148,7 @@ export function OrdersView() {
           loading={loading}
           onImageClick={handleImageClick}
           onStatusChange={changeStatus}
+          onOrderOpen={(code) => setEditing({ code, open: true })}
           pendingCodes={pendingCodes}
         />
       </Stack>
@@ -142,16 +159,35 @@ export function OrdersView() {
       />
       <OrderFormModal
         open={createOpen}
-        onClose={() => setCreateOpen(false)}
+        onClose={() => {
+          setCreateOpen(false);
+          setCreateDirty(false);
+        }}
         title="Tạo đơn hàng mới"
         closeLabel="Đóng"
+        dirty={createDirty}
       >
         <OrderForm
           saleOptions={saleOptions}
           floristOptions={floristOptions}
+          initialValues={createInitial}
           onSubmit={handleCreateOrder}
+          successMessage="Tạo đơn hàng thành công"
+          submitLabel="Tạo đơn hàng"
+          resetLabel="Đặt lại"
+          resetOnSuccess={createEmptyOrderFormValues}
+          onDirtyChange={setCreateDirty}
         />
       </OrderFormModal>
+      <OrderUpdateModal
+        code={editing.code}
+        open={editing.open}
+        onClose={() => setEditing((prev) => ({ ...prev, open: false }))}
+        saleOptions={saleOptions}
+        floristOptions={floristOptions}
+        saveOrder={saveOrder}
+        syncOrder={syncOrder}
+      />
     </AdminLayout>
   );
 }

@@ -2,7 +2,13 @@
 
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import CloudUploadRoundedIcon from "@mui/icons-material/CloudUploadRounded";
-import { Box, Button, IconButton, Typography } from "@mui/material";
+import {
+  Box,
+  Button,
+  FormHelperText,
+  IconButton,
+  Typography,
+} from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import {
   type ChangeEvent,
@@ -12,15 +18,22 @@ import {
   useState,
 } from "react";
 import { useNotification } from "@/providers/NotificationProvider";
-import { ORDER_IMAGE_LIMITS } from "./orderUtils";
+import { ORDER_IMAGE_LIMITS, type OrderImage } from "./orderForm";
 
 export interface SampleImagePickerProps {
-  files: File[];
-  onChange: (files: File[]) => void;
+  /** Existing image URLs and newly picked Files, in display order. */
+  images: OrderImage[];
+  onChange: (images: OrderImage[]) => void;
   disabled?: boolean;
+  error?: string;
 }
 
 const { maxFiles, maxSizeMb, acceptedTypes } = ORDER_IMAGE_LIMITS;
+
+const isFile = (image: OrderImage): image is File => image instanceof File;
+
+const imageKey = (image: OrderImage): string =>
+  isFile(image) ? `${image.name}-${image.size}-${image.lastModified}` : image;
 
 function isSameFile(a: File, b: File): boolean {
   return (
@@ -29,22 +42,31 @@ function isSameFile(a: File, b: File): boolean {
 }
 
 export function SampleImagePicker({
-  files,
+  images,
   onChange,
   disabled = false,
+  error,
 }: SampleImagePickerProps) {
   const theme = useTheme();
   const { notify } = useNotification();
   const [dragging, setDragging] = useState(false);
   const [previews, setPreviews] = useState<string[]>([]);
 
+  // Object URLs only for new Files; existing images are already URLs.
   useEffect(() => {
-    const urls = files.map((file) => URL.createObjectURL(file));
-    setPreviews(urls);
+    const created: string[] = [];
+    setPreviews(
+      images.map((image) => {
+        if (!isFile(image)) return image;
+        const url = URL.createObjectURL(image);
+        created.push(url);
+        return url;
+      }),
+    );
     return () => {
-      for (const url of urls) URL.revokeObjectURL(url);
+      for (const url of created) URL.revokeObjectURL(url);
     };
-  }, [files]);
+  }, [images]);
 
   const addFiles = (incoming: File[]) => {
     if (disabled || incoming.length === 0) return;
@@ -60,9 +82,12 @@ export function SampleImagePicker({
     );
     const sized = valid.filter((file) => file.size <= maxSizeMb * 1024 * 1024);
     const fresh = sized.filter(
-      (file) => !files.some((existing) => isSameFile(existing, file)),
+      (file) =>
+        !images.some(
+          (existing) => isFile(existing) && isSameFile(existing, file),
+        ),
     );
-    const room = maxFiles - files.length;
+    const room = maxFiles - images.length;
     const accepted = fresh.slice(0, Math.max(room, 0));
 
     if (wrongType.length > 0) {
@@ -74,7 +99,7 @@ export function SampleImagePicker({
     if (fresh.length > accepted.length) {
       notify(`Tối đa ${maxFiles} ảnh.`, "warning");
     }
-    if (accepted.length > 0) onChange([...files, ...accepted]);
+    if (accepted.length > 0) onChange([...images, ...accepted]);
   };
 
   const handleInput = (event: ChangeEvent<HTMLInputElement>) => {
@@ -93,7 +118,7 @@ export function SampleImagePicker({
   };
 
   const removeAt = (index: number) =>
-    onChange(files.filter((_, i) => i !== index));
+    onChange(images.filter((_, i) => i !== index));
 
   return (
     <Box>
@@ -113,7 +138,11 @@ export function SampleImagePicker({
           gap: 1,
           p: 3,
           border: "2px dashed",
-          borderColor: dragging ? "primary.main" : "divider",
+          borderColor: error
+            ? "error.main"
+            : dragging
+              ? "primary.main"
+              : "divider",
           borderRadius: 2,
           bgcolor: dragging
             ? alpha(theme.palette.primary.main, 0.08)
@@ -126,7 +155,7 @@ export function SampleImagePicker({
         <CloudUploadRoundedIcon color="primary" />
         <Typography variant="body2" color="text.secondary">
           Kéo thả, dán (Ctrl+V) hoặc chọn ảnh mẫu — JPEG/PNG/WebP, tối đa{" "}
-          {maxSizeMb}MB, {maxFiles} ảnh ({files.length}/{maxFiles})
+          {maxSizeMb}MB, {maxFiles} ảnh ({images.length}/{maxFiles})
         </Typography>
         <Button
           component="label"
@@ -145,7 +174,9 @@ export function SampleImagePicker({
         </Button>
       </Box>
 
-      {files.length > 0 && (
+      {error && <FormHelperText error>{error}</FormHelperText>}
+
+      {images.length > 0 && (
         <Box
           sx={{
             mt: 2,
@@ -157,9 +188,9 @@ export function SampleImagePicker({
             },
           }}
         >
-          {files.map((file, index) => (
+          {images.map((image, index) => (
             <Box
-              key={`${file.name}-${file.size}-${file.lastModified}`}
+              key={imageKey(image)}
               sx={{
                 position: "relative",
                 aspectRatio: "1 / 1",
@@ -173,13 +204,13 @@ export function SampleImagePicker({
                 <Box
                   component="img"
                   src={previews[index]}
-                  alt={file.name}
+                  alt={isFile(image) ? image.name : `Ảnh mẫu ${index + 1}`}
                   sx={{ width: "100%", height: "100%", objectFit: "cover" }}
                 />
               )}
               <IconButton
                 size="small"
-                aria-label={`Xoá ${file.name}`}
+                aria-label={`Xoá ${isFile(image) ? image.name : `ảnh mẫu ${index + 1}`}`}
                 disabled={disabled}
                 onClick={() => removeAt(index)}
                 sx={{

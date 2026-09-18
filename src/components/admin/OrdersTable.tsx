@@ -9,6 +9,7 @@ import {
   FormControl,
   IconButton,
   InputLabel,
+  Link,
   ListItemText,
   MenuItem,
   Select,
@@ -57,6 +58,8 @@ export interface OrdersTableProps {
   loading?: boolean;
   onImageClick: (links: string[]) => void;
   onStatusChange: (order: Order, status: OrderStatus) => void;
+  /** The order code was clicked: open that order for editing. */
+  onOrderOpen: (orderCode: string) => void;
   /** Codes of orders with a change in flight; their status control is disabled. */
   pendingCodes?: ReadonlySet<string>;
 }
@@ -151,6 +154,7 @@ export function OrdersTable({
   loading = false,
   onImageClick,
   onStatusChange,
+  onOrderOpen,
   pendingCodes,
 }: OrdersTableProps) {
   const theme = useTheme();
@@ -262,7 +266,25 @@ export function OrdersTable({
           );
         },
       },
-      { field: "orderCode", headerName: "Mã Đơn", width: 180 },
+      {
+        field: "orderCode",
+        headerName: "Mã Đơn",
+        width: 180,
+        renderCell: (params) => (
+          <Tooltip title="Chỉnh sửa đơn hàng" describeChild>
+            <Link
+              component="button"
+              type="button"
+              variant="body2"
+              underline="hover"
+              onClick={() => onOrderOpen(params.row.orderCode)}
+              sx={{ fontWeight: 600, textAlign: "left" }}
+            >
+              {params.value}
+            </Link>
+          </Tooltip>
+        ),
+      },
       {
         field: "orderDescription",
         headerName: "Thông Tin Đơn",
@@ -439,7 +461,7 @@ export function OrdersTable({
         },
       },
     ],
-    [codeToIndex, handleStatusClick, onImageClick, pendingCodes],
+    [codeToIndex, handleStatusClick, onImageClick, onOrderOpen, pendingCodes],
   );
 
   return (

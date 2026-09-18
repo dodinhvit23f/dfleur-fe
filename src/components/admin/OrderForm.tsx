@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Alert,
   Autocomplete,
   Box,
   Button,
@@ -18,24 +19,35 @@ import {
 import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
 import { DateTimePicker } from "@mui/x-date-pickers/DateTimePicker";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
-import { type ReactNode, useRef } from "react";
+import { type ReactNode, useEffect, useMemo, useRef } from "react";
 import {
-  type CreateOrderPayload,
   CUSTOMER_SOURCE_OPTIONS,
   DELIVERY_FEE_OPTIONS,
   formatMoneyInput,
-  formatVnd,
+  ORDER_FIELD_LABELS,
+  type OrderFormValues,
   toDigits,
   VAT_OPTIONS,
-} from "./orderUtils";
+} from "./orderForm";
+import { type CreateOrderPayload, formatVnd } from "./orderUtils";
 import { SampleImagePicker } from "./SampleImagePicker";
 import { useOrderForm } from "./useOrderForm";
 
 export interface OrderFormProps {
   saleOptions: string[];
   floristOptions: string[];
+  /** Starting values; a replaced object rebases the draft (see `useOrderForm`). */
+  initialValues: OrderFormValues;
   onSubmit: (order: CreateOrderPayload) => Promise<void> | void;
+  successMessage: string;
+  submitLabel: string;
+  resetLabel: string;
+  /** Keep the save button disabled until something changed (editing). */
+  requireChange?: boolean;
+  resetOnSuccess?: () => OrderFormValues;
   onSuccess?: () => void;
+  onStale?: () => Promise<unknown>;
+  onDirtyChange?: (dirty: boolean) => void;
 }
 
 // Fields flow into as many ~200px columns as fit (3 in a wide half-width card,
@@ -79,6 +91,7 @@ interface MoneyFieldProps {
   onChange: (digits: string) => void;
   disabled?: boolean;
   required?: boolean;
+  error?: string;
 }
 
 function MoneyField({
@@ -87,6 +100,7 @@ function MoneyField({
   onChange,
   disabled,
   required,
+  error,
 }: MoneyFieldProps) {
   return (
     <TextField
@@ -94,6 +108,8 @@ function MoneyField({
       fullWidth
       required={required}
       disabled={disabled}
+      error={Boolean(error)}
+      helperText={error}
       label={label}
       value={formatMoneyInput(value)}
       onChange={(event) => onChange(toDigits(event.target.value))}
@@ -119,11 +135,26 @@ function ReadOnlyMoney({ label, value }: { label: string; value: number }) {
   );
 }
 
+// An account already on the order but missing from the staff list (e.g. a
+// deactivated user) must stay selectable, or saving would silently drop it.
+function withSelected(options: string[], selected: string[]): string[] {
+  const extra = selected.filter((account) => !options.includes(account));
+  return extra.length > 0 ? [...options, ...extra] : options;
+}
+
 export function OrderForm({
   saleOptions,
   floristOptions,
+  initialValues,
   onSubmit,
+  successMessage,
+  submitLabel,
+  resetLabel,
+  requireChange = false,
+  resetOnSuccess,
   onSuccess,
+  onStale,
+  onDirtyChange,
 }: OrderFormProps) {
   const formRef = useRef<HTMLFormElement>(null);
   // The submit button is at the bottom of a long form; after a successful
@@ -132,8 +163,57 @@ export function OrderForm({
     formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     onSuccess?.();
   };
-  const { values, totals, setField, reset, submit, submitting, progress } =
-    useOrderForm({ onSubmit, onSuccess: handleSuccess });
+  const {
+    values,
+    errors,
+    conflicts,
+    dirty,
+    totals,
+    setField,
+    reset,
+    dismissConflicts,
+    submit,
+    submitting,
+    progress,
+  } = useOrderForm({
+    initialValues,
+    onSubmit,
+    successMessage,
+    resetOnSuccess,
+    onSuccess: handleSuccess,
+    onStale,
+  });
+
+  useEffect(() => onDirtyChange?.(dirty), [dirty, onDirtyChange]);
+
+  // The alert sits at the top; the user may be scrolled down at the save button.
+  const conflictRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (conflicts.length > 0) {
+      conflictRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    }
+  }, [conflicts]);
+
+  const saleChoices = useMemo(
+    () => withSelected(saleOptions, values.saleAccounts),
+    [saleOptions, values.saleAccounts],
+  );
+  const floristChoices = useMemo(
+    () => withSelected(floristOptions, values.floristAccounts),
+    [floristOptions, values.floristAccounts],
+  );
+  // A source that isn't one of the known options is kept selectable as-is.
+  const sourceOptions = CUSTOMER_SOURCE_OPTIONS.some(
+    (option) => option.value === values.customerSource,
+  )
+    ? CUSTOMER_SOURCE_OPTIONS
+    : [
+        ...CUSTOMER_SOURCE_OPTIONS,
+        { label: values.customerSource, value: values.customerSource },
+      ];
 
   const deliveryHint = DELIVERY_FEE_OPTIONS.find(
     (option) => option.value === values.deliveryFeeOption,
@@ -163,6 +243,19 @@ export function OrderForm({
           gap: 2,
         }}
       >
+        {conflicts.length > 0 && (
+          <Alert
+            ref={conflictRef}
+            severity="warning"
+            onClose={dismissConflicts}
+          >
+            Đơn hàng đã được người khác chỉnh sửa. Các trường sau cả hai bên
+            cùng thay đổi, đã giữ giá trị của bạn:{" "}
+            {conflicts.map((field) => ORDER_FIELD_LABELS[field]).join(", ")}.
+            Hãy kiểm tra lại trước khi lưu.
+          </Alert>
+        )}
+
         <Box sx={cardRow}>
           <Box sx={cardColumn}>
             <Section title="Thông tin khách hàng">
@@ -172,6 +265,8 @@ export function OrderForm({
                   required
                   label="Tên người đặt"
                   value={values.customerName}
+                  error={Boolean(errors.customerName)}
+                  helperText={errors.customerName}
                   disabled={submitting}
                   onChange={(e) => setField("customerName", e.target.value)}
                 />
@@ -180,6 +275,8 @@ export function OrderForm({
                   required
                   label="Số điện thoại người đặt"
                   value={values.customerPhone}
+                  error={Boolean(errors.customerPhone)}
+                  helperText={errors.customerPhone}
                   disabled={submitting}
                   onChange={(e) => setField("customerPhone", e.target.value)}
                 />
@@ -190,7 +287,7 @@ export function OrderForm({
                     value={values.customerSource}
                     onChange={(e) => setField("customerSource", e.target.value)}
                   >
-                    {CUSTOMER_SOURCE_OPTIONS.map((option) => (
+                    {sourceOptions.map((option) => (
                       <MenuItem key={option.value} value={option.value}>
                         {option.label}
                       </MenuItem>
@@ -201,6 +298,8 @@ export function OrderForm({
                   size="small"
                   label="Đường dẫn mạng xã hội"
                   value={values.socialLink}
+                  error={Boolean(errors.socialLink)}
+                  helperText={errors.socialLink}
                   disabled={submitting}
                   onChange={(e) => setField("socialLink", e.target.value)}
                   sx={fullWidth}
@@ -215,6 +314,8 @@ export function OrderForm({
                   required
                   label="Địa chỉ giao"
                   value={values.deliveryAddress}
+                  error={Boolean(errors.deliveryAddress)}
+                  helperText={errors.deliveryAddress}
                   disabled={submitting}
                   onChange={(e) => setField("deliveryAddress", e.target.value)}
                   sx={fullWidth}
@@ -227,7 +328,13 @@ export function OrderForm({
                   onChange={(date) =>
                     date && setField("deliveryDateStart", date)
                   }
-                  slotProps={{ textField: { size: "small" } }}
+                  slotProps={{
+                    textField: {
+                      size: "small",
+                      error: Boolean(errors.deliveryDateStart),
+                      helperText: errors.deliveryDateStart,
+                    },
+                  }}
                 />
                 <DateTimePicker
                   ampm={false}
@@ -235,7 +342,13 @@ export function OrderForm({
                   value={values.deliveryDateEnd}
                   disabled={submitting}
                   onChange={(date) => date && setField("deliveryDateEnd", date)}
-                  slotProps={{ textField: { size: "small" } }}
+                  slotProps={{
+                    textField: {
+                      size: "small",
+                      error: Boolean(errors.deliveryDateEnd),
+                      helperText: errors.deliveryDateEnd,
+                    },
+                  }}
                 />
                 <TextField
                   size="small"
@@ -268,23 +381,31 @@ export function OrderForm({
             <Section title="Nhân viên phụ trách">
               <Box sx={fieldGrid}>
                 <Autocomplete
+                  multiple
+                  filterSelectedOptions
                   size="small"
-                  options={saleOptions}
-                  value={values.saleAccount || null}
+                  options={saleChoices}
+                  value={values.saleAccounts}
                   disabled={submitting}
-                  onChange={(_, value) => setField("saleAccount", value ?? "")}
+                  onChange={(_, value) => setField("saleAccounts", value)}
                   renderInput={(params) => (
-                    <TextField {...params} required label="Nhân viên sale" />
+                    <TextField
+                      {...params}
+                      required
+                      label="Nhân viên sale"
+                      error={Boolean(errors.saleAccounts)}
+                      helperText={errors.saleAccounts}
+                    />
                   )}
                 />
                 <Autocomplete
+                  multiple
+                  filterSelectedOptions
                   size="small"
-                  options={floristOptions}
-                  value={values.floristAccount || null}
+                  options={floristChoices}
+                  value={values.floristAccounts}
                   disabled={submitting}
-                  onChange={(_, value) =>
-                    setField("floristAccount", value ?? "")
-                  }
+                  onChange={(_, value) => setField("floristAccounts", value)}
                   renderInput={(params) => (
                     <TextField {...params} label="Nhân viên florist" />
                   )}
@@ -297,12 +418,14 @@ export function OrderForm({
                 <MoneyField
                   required
                   label="Giá niêm yết"
+                  error={errors.actualPrice}
                   value={values.actualPrice}
                   disabled={submitting}
                   onChange={(v) => setField("actualPrice", v)}
                 />
                 <MoneyField
                   label="Chiết khấu"
+                  error={errors.discount}
                   value={values.discount}
                   disabled={submitting}
                   onChange={(v) => setField("discount", v)}
@@ -348,6 +471,7 @@ export function OrderForm({
                 </FormControl>
                 <MoneyField
                   label="Số tiền đặt cọc"
+                  error={errors.deposit}
                   value={values.deposit}
                   disabled={submitting}
                   onChange={(v) => setField("deposit", v)}
@@ -401,9 +525,10 @@ export function OrderForm({
 
           <Section title="Ảnh mẫu">
             <SampleImagePicker
-              files={values.images}
+              images={values.images}
+              error={errors.images}
               disabled={submitting}
-              onChange={(files) => setField("images", files)}
+              onChange={(images) => setField("images", images)}
             />
           </Section>
         </Box>
@@ -427,11 +552,19 @@ export function OrderForm({
         )}
 
         <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 1.5 }}>
-          <Button variant="outlined" disabled={submitting} onClick={reset}>
-            Đặt lại
+          <Button
+            variant="outlined"
+            disabled={submitting || !dirty}
+            onClick={reset}
+          >
+            {resetLabel}
           </Button>
-          <Button type="submit" variant="contained" disabled={submitting}>
-            Tạo đơn hàng
+          <Button
+            type="submit"
+            variant="contained"
+            disabled={submitting || (requireChange && !dirty)}
+          >
+            {submitLabel}
           </Button>
         </Box>
       </Box>

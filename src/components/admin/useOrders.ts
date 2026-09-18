@@ -1,10 +1,12 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
+import { ApiError } from "@/lib/api/client";
 import {
   getOrders,
   isStaleOrderError,
   type OrderListParams,
+  updateOrderApi,
   updateOrderStatusApi,
 } from "@/lib/api/orders";
 import { useApiErrorHandler } from "@/lib/api/useApiErrorHandler";
@@ -14,6 +16,8 @@ import {
   mergeFetchedOrders,
   type Order,
   type OrderStatus,
+  replaceOrderByCode,
+  type UpdateOrderPayload,
 } from "./orderUtils";
 
 export function useOrders() {
@@ -90,6 +94,30 @@ export function useOrders() {
     setRowCount((count) => count + 1);
   }, []);
 
+  // Puts a freshly fetched copy of one order into the current rows (found by
+  // its code); the row keeps its position and a newer local version wins.
+  const syncOrder = useCallback((order: Order) => {
+    setOrders((prev) => replaceOrderByCode(prev, order));
+  }, []);
+
+  // Saves an edited order and patches its row in place — no list call, no page
+  // jump. Holds the same per-order lock as a status change, so the two can't
+  // overlap. Errors (stale conflict included) propagate to the caller/form.
+  const saveOrder = useCallback(
+    async (payload: UpdateOrderPayload) => {
+      if (!lockOrder(payload.orderCode)) throw new ApiError("ORDER_BUSY", 409);
+      try {
+        const saved = await updateOrderApi(payload);
+        // Never let the row's version fall behind what was just written.
+        const version = Math.max(saved.version, payload.version + 1);
+        setOrders((prev) => replaceOrderByCode(prev, { ...saved, version }));
+      } finally {
+        unlockOrder(payload.orderCode);
+      }
+    },
+    [lockOrder, unlockOrder],
+  );
+
   const changeStatus = useCallback(
     async (order: Order, status: OrderStatus) => {
       // A second change on the same order while one is in flight is dropped
@@ -136,6 +164,8 @@ export function useOrders() {
     fetchOrders,
     refresh,
     addOrder,
+    syncOrder,
+    saveOrder,
     changeStatus,
   };
 }

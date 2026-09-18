@@ -17,7 +17,7 @@ import { useRouter } from "next/navigation";
 import { type SyntheticEvent, useState } from "react";
 import { loginApi } from "@/lib/api/auth";
 import { ErrorMessage, getErrorCode } from "@/lib/api/errors";
-import { STORAGE_KEYS } from "@/lib/storage";
+import { STORAGE_KEYS, setAccount } from "@/lib/storage";
 import { useNotification } from "@/providers/NotificationProvider";
 
 const MIN_LENGTH = 6;
@@ -73,6 +73,7 @@ export default function LoginPage() {
         password,
       );
       localStorage.setItem(STORAGE_KEYS.OTP_TOKEN, otpToken);
+      setAccount(username.trim());
       notifySuccess("Đăng nhập thành công");
       router.push(
         requiredGenerateOTP ? "/auth/qr/generator" : "/auth/qr/verify",
