@@ -444,7 +444,7 @@ export function OrdersTable({
           const link = params.row.socialLink;
           const enabled = hasSocialLink(link);
           return (
-            <Tooltip title={enabled ? "Open link" : "No link"}>
+            <Tooltip title={enabled ? link : "No link"}>
               <span>
                 <IconButton
                   size="small"

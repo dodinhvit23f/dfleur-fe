@@ -291,24 +291,25 @@ export function formatContact(
 
 /**
  * The customer's "Name · Phone" when the customer is a different person from
- * the receiver, otherwise null (nothing extra worth showing). The customer is
- * treated as the receiver when their name OR their phone matches the receiver's
- * (names case-insensitively, phones by digits only) — a phone typo shouldn't
- * make the same person show up twice. A customer with no name and no phone
- * yields null.
+ * the receiver, otherwise null (nothing extra worth showing). When both have a
+ * phone, the phone decides (compared by digits only): two people can share a
+ * name, so "Tom Do · 090…135" and "Tom Do · 090…134" are different people. Only
+ * when a phone is missing on either side does the name (case-insensitive) decide.
+ * A customer with no name and no phone yields null.
  */
 export function getExtraCustomerContact(order: Order): string | null {
   const name = clean(order.customerName);
   const phone = clean(order.customerPhone);
   if (!name && !phone) return null;
 
-  const receiverName = clean(order.receiverName);
-  const receiverPhone = digitsOnly(order.receiverPhone);
-  const sameName =
-    name !== "" && name.toLowerCase() === receiverName.toLowerCase();
-  const samePhone =
-    digitsOnly(phone) !== "" && digitsOnly(phone) === receiverPhone;
-  if (sameName || samePhone) return null;
+  const customerDigits = digitsOnly(phone);
+  const receiverDigits = digitsOnly(order.receiverPhone);
+  const samePerson =
+    customerDigits !== "" && receiverDigits !== ""
+      ? customerDigits === receiverDigits
+      : name !== "" &&
+        name.toLowerCase() === clean(order.receiverName).toLowerCase();
+  if (samePerson) return null;
 
   return formatContact(name, phone);
 }
