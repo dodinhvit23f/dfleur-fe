@@ -68,6 +68,9 @@ const STICKY_COLUMN_OFFSETS: Record<string, number> = {
   orderCode: 310,
 };
 const LAST_STICKY_FIELD = "orderCode";
+// The table is a fixed-height box that scrolls internally; below this it stops
+// shrinking (short windows, or a toolbar with many chips) and the page scrolls.
+const TABLE_MIN_HEIGHT = 420;
 
 function StatusFilterInput({ item, applyValue }: GridFilterInputValueProps) {
   const value: OrderStatus[] = item.value ?? [];
@@ -151,6 +154,11 @@ export function OrdersTable({
   pendingCodes,
 }: OrdersTableProps) {
   const theme = useTheme();
+  // One value for every header surface (regular + sticky cells, filler, sort
+  // button) so the sticky columns can't drift from the rest of the header.
+  const headerBg = theme.palette.background.paper;
+  const scrollbarThumb = alpha(theme.palette.text.secondary, 0.35);
+  const scrollbarThumbHover = alpha(theme.palette.text.secondary, 0.55);
 
   const codeToIndex = useMemo(() => {
     const map = new Map<string, number>();
@@ -441,6 +449,12 @@ export function OrdersTable({
         borderRadius: 2,
         border: `1px solid ${alpha(theme.palette.text.secondary, 0.2)}`,
         overflow: "hidden",
+        // Takes the height its parent leaves (OrdersView gives it a bounded
+        // column); the grid inside scrolls, the page doesn't.
+        flex: "1 1 0",
+        minHeight: TABLE_MIN_HEIGHT,
+        display: "flex",
+        flexDirection: "column",
       }}
     >
       <DataGrid
@@ -459,18 +473,45 @@ export function OrdersTable({
         paginationModel={paginationModel}
         onPaginationModelChange={onPaginationModelChange}
         loading={loading}
-        autoHeight
         disableVirtualization
         slots={{ footer: OrdersGridFooter }}
         sx={{
+          flex: 1,
+          minHeight: 0,
           border: "none",
+          "--DataGrid-t-header-background-base": headerBg,
+          // The grid pins its header row to the top of its own scroller.
           "& .MuiDataGrid-columnHeaders": {
-            position: "sticky",
-            top: 0,
-            zIndex: 1,
-            bgcolor: theme.palette.background.default,
+            bgcolor: headerBg,
             borderBottom: `1px solid ${alpha(theme.palette.text.secondary, 0.2)}`,
             boxShadow: `0 4px 6px -2px ${alpha(theme.palette.text.primary, 0.08)}`,
+          },
+          // The grid draws its own scrollbars (.MuiDataGrid-scrollbar, 14px, the
+          // virtual scroller's native ones are hidden). Drop the arrow buttons at
+          // their ends and slim the thumb. Chromium/Safari take the
+          // ::-webkit-scrollbar rules; browsers without them (Firefox) get the
+          // standard properties, which have no arrows either.
+          "& .MuiDataGrid-scrollbar": {
+            "&::-webkit-scrollbar": { width: 14, height: 14 },
+            "&::-webkit-scrollbar-button": {
+              display: "none",
+              width: 0,
+              height: 0,
+            },
+            "&::-webkit-scrollbar-track, &::-webkit-scrollbar-corner": {
+              backgroundColor: "transparent",
+            },
+            "&::-webkit-scrollbar-thumb": {
+              backgroundColor: scrollbarThumb,
+              backgroundClip: "content-box",
+              border: "4px solid transparent",
+              borderRadius: 7,
+              "&:hover": { backgroundColor: scrollbarThumbHover },
+            },
+            "@supports not selector(::-webkit-scrollbar)": {
+              scrollbarWidth: "thin",
+              scrollbarColor: `${scrollbarThumb} transparent`,
+            },
           },
           "& .MuiDataGrid-columnHeaderTitleContainer": {
             whiteSpace: "normal",
@@ -513,7 +554,7 @@ export function OrdersTable({
                     position: "sticky",
                     left,
                     zIndex: 3,
-                    bgcolor: theme.palette.background.default,
+                    bgcolor: headerBg,
                     ...edgeShadow,
                   },
                 ],

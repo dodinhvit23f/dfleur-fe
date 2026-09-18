@@ -9,7 +9,7 @@ import {
   type OrderListParams,
 } from "@/lib/api/orders";
 import { useNotification } from "@/providers/NotificationProvider";
-import { AdminLayout } from "./AdminLayout";
+import { ADMIN_CONTENT_CHROME, AdminLayout } from "./AdminLayout";
 import { OrderForm } from "./OrderForm";
 import { OrderFormModal } from "./OrderFormModal";
 import { OrdersFilterToolbar } from "./OrdersFilterToolbar";
@@ -104,7 +104,17 @@ export function OrdersView() {
 
   return (
     <AdminLayout title="D'Fleur Admin Panel - Orders List">
-      <Stack spacing={3}>
+      {/* Fills the viewport under the shell: the toolbar keeps its height and the
+          table takes the rest, so only the table scrolls, not the page. */}
+      <Stack
+        spacing={3}
+        sx={{
+          height: {
+            xs: `calc(100vh - ${ADMIN_CONTENT_CHROME.xs}px)`,
+            md: `calc(100vh - ${ADMIN_CONTENT_CHROME.md}px)`,
+          },
+        }}
+      >
         <OrdersFilterToolbar
           saleOptions={saleOptions}
           floristOptions={floristOptions}

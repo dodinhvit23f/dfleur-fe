@@ -17,6 +17,14 @@ import { AdminSidebar } from "./AdminSidebar";
 
 export const DRAWER_WIDTH = 280;
 const APPBAR_HEIGHT = 72;
+// Space the shell keeps above and below the page content (px), so a page that
+// wants to fill the viewport can size itself with ADMIN_CONTENT_CHROME.
+const CONTENT_TOP_GAP = { xs: 24, md: 32 } as const;
+const CONTENT_BOTTOM_PAD = { xs: 24, md: 40 } as const;
+export const ADMIN_CONTENT_CHROME = {
+  xs: APPBAR_HEIGHT + CONTENT_TOP_GAP.xs + CONTENT_BOTTOM_PAD.xs,
+  md: APPBAR_HEIGHT + CONTENT_TOP_GAP.md + CONTENT_BOTTOM_PAD.md,
+} as const;
 
 export interface AdminLayoutProps {
   title: string;
@@ -108,10 +116,22 @@ export function AdminLayout({ title, children }: AdminLayoutProps) {
           minHeight: "100vh",
           pt: `${APPBAR_HEIGHT}px`,
           px: { xs: 2, md: 4 },
-          pb: { xs: 3, md: 5 },
+          pb: {
+            xs: `${CONTENT_BOTTOM_PAD.xs}px`,
+            md: `${CONTENT_BOTTOM_PAD.md}px`,
+          },
         }}
       >
-        <Box sx={{ mt: { xs: 3, md: 4 } }}>{children}</Box>
+        <Box
+          sx={{
+            mt: {
+              xs: `${CONTENT_TOP_GAP.xs}px`,
+              md: `${CONTENT_TOP_GAP.md}px`,
+            },
+          }}
+        >
+          {children}
+        </Box>
       </Box>
     </Box>
   );
