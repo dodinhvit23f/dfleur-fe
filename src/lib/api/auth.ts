@@ -10,7 +10,6 @@ export interface LoginResult {
 export const loginApi = async (
   username: string,
   password: string,
-  tenant?: string,
 ): Promise<LoginResult> => {
   const url = requireEnv(
     "NEXT_PUBLIC_API_LOGIN",
@@ -18,7 +17,7 @@ export const loginApi = async (
   );
   const response = await postJson<{ data: LoginResult }>(
     url,
-    { username, password},
+    { username, password },
     { fallbackErrorCode: "LOGIN_FAILED" },
   );
   return response.data;

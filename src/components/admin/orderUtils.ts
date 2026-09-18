@@ -163,6 +163,58 @@ export function formatOrderTimeRange(start: string, end: string): string {
   return `${startLabel} - ${endLabel}`;
 }
 
+const deliveryTime = (raw: string): number => {
+  const time = parseOrderDate(raw).getTime();
+  return Number.isNaN(time) ? Number.NEGATIVE_INFINITY : time;
+};
+
+/** Newest delivery start first, ties broken by newest delivery end; unparseable dates last. */
+export function compareOrdersByDeliveryDesc(a: Order, b: Order): number {
+  const byStart =
+    deliveryTime(b.deliveryDateStart) - deliveryTime(a.deliveryDateStart);
+  if (byStart !== 0 && !Number.isNaN(byStart)) return byStart;
+  const byEnd =
+    deliveryTime(b.deliveryDateEnd) - deliveryTime(a.deliveryDateEnd);
+  return Number.isNaN(byEnd) ? 0 : byEnd;
+}
+
+/** Of two copies of the same order, the one with the higher version (the incoming one on a tie). */
+export function pickNewerOrder(current: Order, incoming: Order): Order {
+  return incoming.version >= current.version ? incoming : current;
+}
+
+/**
+ * Adds `order` and re-sorts by delivery time, newest first. A row with the same
+ * code is replaced unless the existing copy has a newer version.
+ */
+export function insertOrderSorted(orders: Order[], order: Order): Order[] {
+  const existing = orders.find((row) => row.orderCode === order.orderCode);
+  return [
+    ...orders.filter((row) => row.orderCode !== order.orderCode),
+    existing ? pickNewerOrder(existing, order) : order,
+  ].sort(compareOrdersByDeliveryDesc);
+}
+
+/**
+ * Merges a fetched page into the rows currently shown, row by row: a row with a
+ * mutation in flight (`lockedCodes`) keeps its local copy, otherwise the higher
+ * version wins. Order and membership follow the fetched page.
+ */
+export function mergeFetchedOrders(
+  local: Order[],
+  fetched: Order[],
+  lockedCodes: ReadonlySet<string>,
+): Order[] {
+  const localByCode = new Map(local.map((row) => [row.orderCode, row]));
+  return fetched.map((row) => {
+    const current = localByCode.get(row.orderCode);
+    if (!current) return row;
+    return lockedCodes.has(row.orderCode)
+      ? current
+      : pickNewerOrder(current, row);
+  });
+}
+
 export interface DeliveryWindow {
   /** True when start and end fall on the same calendar day (or one is unparseable). */
   sameDay: boolean;

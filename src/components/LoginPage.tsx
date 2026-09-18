@@ -13,7 +13,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { type SyntheticEvent, useState } from "react";
 import { loginApi } from "@/lib/api/auth";
 import { ErrorMessage, getErrorCode } from "@/lib/api/errors";
@@ -24,7 +24,6 @@ const MIN_LENGTH = 6;
 
 export default function LoginPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { notifySuccess, notifyError } = useNotification();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");

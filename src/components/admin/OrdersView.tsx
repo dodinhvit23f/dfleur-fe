@@ -29,8 +29,16 @@ const SEARCH_DEBOUNCE_MS = 400;
 export function OrdersView() {
   const { notify } = useNotification();
   const { saleOptions, floristOptions } = useStaffOptions();
-  const { orders, rowCount, loading, fetchOrders, refresh, changeStatus } =
-    useOrders();
+  const {
+    orders,
+    rowCount,
+    loading,
+    pendingCodes,
+    fetchOrders,
+    refresh,
+    addOrder,
+    changeStatus,
+  } = useOrders();
   const [filters, setFilters] = useState(emptyOrdersFilterState);
   const [paginationModel, setPaginationModel] = useState<GridPaginationModel>({
     page: 0,
@@ -88,13 +96,13 @@ export function OrdersView() {
 
   const handleCreateOrder = useCallback(
     async (payload: CreateOrderPayload) => {
-      await createOrderApi(payload);
-      // Show the new order: jump to page 1 (that triggers the refetch), or
-      // refetch in place if we're already there.
-      if (paginationModel.page === 0) await refresh();
-      else setPaginationModel((prev) => ({ ...prev, page: 0 }));
+      const created = await createOrderApi(payload);
+      // No list call: put the created order straight into the rows. If the
+      // response isn't a usable order, fall back to reloading the list.
+      if (created?.orderCode) addOrder(created);
+      else await refresh();
     },
-    [paginationModel.page, refresh],
+    [addOrder, refresh],
   );
 
   const handleImageClick = useCallback((links: string[]) => {
@@ -122,6 +130,7 @@ export function OrdersView() {
           loading={loading}
           onImageClick={handleImageClick}
           onStatusChange={changeStatus}
+          pendingCodes={pendingCodes}
         />
       </Stack>
       <SliceImages

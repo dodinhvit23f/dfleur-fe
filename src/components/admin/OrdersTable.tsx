@@ -57,6 +57,8 @@ export interface OrdersTableProps {
   loading?: boolean;
   onImageClick: (links: string[]) => void;
   onStatusChange: (order: Order, status: OrderStatus) => void;
+  /** Codes of orders with a change in flight; their status control is disabled. */
+  pendingCodes?: ReadonlySet<string>;
 }
 
 const STICKY_COLUMN_OFFSETS: Record<string, number> = {
@@ -146,6 +148,7 @@ export function OrdersTable({
   loading = false,
   onImageClick,
   onStatusChange,
+  pendingCodes,
 }: OrdersTableProps) {
   const theme = useTheme();
 
@@ -205,6 +208,7 @@ export function OrdersTable({
             status={getStatusType(params.row.status)}
             label={trans(params.row.status)}
             clickable
+            disabled={pendingCodes?.has(params.row.orderCode)}
             onClick={(event) =>
               handleStatusClick(
                 event,
@@ -427,7 +431,7 @@ export function OrdersTable({
         },
       },
     ],
-    [codeToIndex, handleStatusClick, onImageClick],
+    [codeToIndex, handleStatusClick, onImageClick, pendingCodes],
   );
 
   return (

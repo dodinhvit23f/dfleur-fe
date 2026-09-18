@@ -8,6 +8,7 @@ export interface StatusChipProps {
   status: OrderStatusVariant;
   label: string;
   clickable?: boolean;
+  disabled?: boolean;
   onClick?: ChipProps["onClick"];
   size?: ChipProps["size"];
 }
@@ -16,6 +17,7 @@ export function StatusChip({
   status,
   label,
   clickable,
+  disabled,
   onClick,
   size = "small",
 }: StatusChipProps) {
@@ -51,6 +53,7 @@ export function StatusChip({
       size={size}
       label={label}
       clickable={clickable}
+      disabled={disabled}
       onClick={onClick}
       sx={{
         bgcolor: bg,
