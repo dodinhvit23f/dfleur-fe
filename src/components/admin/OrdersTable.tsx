@@ -31,9 +31,11 @@ import type { MouseEvent } from "react";
 import { useCallback, useMemo, useState } from "react";
 import {
   compareOrderStatus,
+  formatContact,
   formatOrderDate,
   formatOrderTimeRange,
   formatVnd,
+  getExtraCustomerContact,
   getStatusType,
   hasSamplePicture,
   hasSocialLink,
@@ -302,10 +304,50 @@ export function OrdersTable({
       },
       {
         field: "receiver",
-        headerName: "Người Nhận",
-        width: 200,
+        headerName: "Liên Hệ",
+        width: 220,
         valueGetter: (_value, row) =>
-          `${row.receiverName} · ${row.receiverPhone}`,
+          formatContact(row.receiverName, row.receiverPhone) || "—",
+        renderCell: (params) => {
+          const extra = getExtraCustomerContact(params.row as Order);
+          const wrap = {
+            whiteSpace: "normal",
+            wordBreak: "break-word",
+          } as const;
+          // Same person: just the receiver's name + phone.
+          if (!extra) {
+            return (
+              <Typography variant="body2" sx={wrap}>
+                {params.value}
+              </Typography>
+            );
+          }
+          // Different person: label both lines so they can't be confused.
+          return (
+            <Box sx={{ py: 0.5 }}>
+              <Typography variant="body2" sx={wrap}>
+                <Typography
+                  component="span"
+                  variant="caption"
+                  color="text.secondary"
+                >
+                  Nhận:{" "}
+                </Typography>
+                {params.value}
+              </Typography>
+              <Typography variant="body2" sx={wrap}>
+                <Typography
+                  component="span"
+                  variant="caption"
+                  color="text.secondary"
+                >
+                  Đặt:{" "}
+                </Typography>
+                {extra}
+              </Typography>
+            </Box>
+          );
+        },
       },
       {
         field: "saleAccount",

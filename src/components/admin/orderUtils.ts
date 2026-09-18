@@ -172,6 +172,42 @@ export function formatVnd(value: number): string {
   return vndFormatter.format(value);
 }
 
+const clean = (value: string | null | undefined): string => value?.trim() ?? "";
+const digitsOnly = (value: string | null | undefined): string =>
+  clean(value).replace(/\D/g, "");
+
+/** "Name · Phone", skipping whichever part is missing (null/undefined/blank). */
+export function formatContact(
+  name: string | null | undefined,
+  phone: string | null | undefined,
+): string {
+  return [clean(name), clean(phone)].filter(Boolean).join(" · ");
+}
+
+/**
+ * The customer's "Name · Phone" when the customer is a different person from
+ * the receiver, otherwise null (nothing extra worth showing). The customer is
+ * treated as the receiver when their name OR their phone matches the receiver's
+ * (names case-insensitively, phones by digits only) — a phone typo shouldn't
+ * make the same person show up twice. A customer with no name and no phone
+ * yields null.
+ */
+export function getExtraCustomerContact(order: Order): string | null {
+  const name = clean(order.customerName);
+  const phone = clean(order.customerPhone);
+  if (!name && !phone) return null;
+
+  const receiverName = clean(order.receiverName);
+  const receiverPhone = digitsOnly(order.receiverPhone);
+  const sameName =
+    name !== "" && name.toLowerCase() === receiverName.toLowerCase();
+  const samePhone =
+    digitsOnly(phone) !== "" && digitsOnly(phone) === receiverPhone;
+  if (sameName || samePhone) return null;
+
+  return formatContact(name, phone);
+}
+
 export function hasSocialLink(socialLink: string | undefined): boolean {
   return Boolean(socialLink) && socialLink !== "None";
 }
