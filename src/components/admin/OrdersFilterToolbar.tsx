@@ -62,6 +62,7 @@ export interface OrdersFilterToolbarProps {
   onExport: () => void;
   onPrint: () => void;
   onNewOrder?: () => void;
+  selectedCount: number;
 }
 
 export function OrdersFilterToolbar({
@@ -72,6 +73,7 @@ export function OrdersFilterToolbar({
   onExport,
   onPrint,
   onNewOrder,
+  selectedCount,
 }: OrdersFilterToolbarProps) {
   // Edits are staged in `draft`; only "Áp dụng" (or Enter in the search box)
   // hands them to `onFiltersChange`, so the server isn't queried per keystroke
@@ -264,15 +266,24 @@ export function OrdersFilterToolbar({
                   <FileDownloadRoundedIcon />
                 </IconButton>
               </Tooltip>
-              <Tooltip title="Print Order">
-                <IconButton
-                  size="small"
-                  color="primary"
-                  onClick={onPrint}
-                  sx={iconButtonSx}
-                >
-                  <PrintRoundedIcon />
-                </IconButton>
+              <Tooltip
+                title={
+                  selectedCount > 0
+                    ? `In ${selectedCount} đơn hàng đã chọn`
+                    : "Chọn đơn hàng để in"
+                }
+              >
+                <span>
+                  <IconButton
+                    size="small"
+                    color="primary"
+                    onClick={onPrint}
+                    disabled={selectedCount === 0}
+                    sx={iconButtonSx}
+                  >
+                    <PrintRoundedIcon />
+                  </IconButton>
+                </span>
               </Tooltip>
             </Box>
           </Box>

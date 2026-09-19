@@ -23,6 +23,7 @@ import {
   type GridFilterInputValueProps,
   GridPagination,
   type GridPaginationModel,
+  type GridRowSelectionModel,
   gridPageCountSelector,
   gridRowCountSelector,
   useGridApiContext,
@@ -55,6 +56,8 @@ export interface OrdersTableProps {
   rowCount: number;
   paginationModel: GridPaginationModel;
   onPaginationModelChange: (model: GridPaginationModel) => void;
+  rowSelectionModel: GridRowSelectionModel;
+  onRowSelectionModelChange: (model: GridRowSelectionModel) => void;
   loading?: boolean;
   onImageClick: (links: string[]) => void;
   onStatusChange: (order: Order, status: OrderStatus) => void;
@@ -151,6 +154,8 @@ export function OrdersTable({
   rowCount,
   paginationModel,
   onPaginationModelChange,
+  rowSelectionModel,
+  onRowSelectionModelChange,
   loading = false,
   onImageClick,
   onStatusChange,
@@ -484,6 +489,8 @@ export function OrdersTable({
         columns={columns}
         getRowId={(row) => row.orderCode}
         checkboxSelection
+        rowSelectionModel={rowSelectionModel}
+        onRowSelectionModelChange={onRowSelectionModelChange}
         disableRowSelectionOnClick
         density="compact"
         columnHeaderHeight={72}

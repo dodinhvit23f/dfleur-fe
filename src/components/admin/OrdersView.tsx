@@ -1,7 +1,10 @@
 "use client";
 
 import { Stack } from "@mui/material";
-import type { GridPaginationModel } from "@mui/x-data-grid";
+import type {
+  GridPaginationModel,
+  GridRowSelectionModel,
+} from "@mui/x-data-grid";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   buildOrderQuery,
@@ -23,9 +26,28 @@ import {
   type Order,
   type OrdersFilterState,
 } from "./orderUtils";
+import { PrintOrdersDialog } from "./PrintOrdersDialog";
 import { SliceImages } from "./SliceImages";
 import { useOrders } from "./useOrders";
 import { useStaffOptions } from "./useStaffOptions";
+
+const EMPTY_SELECTION: GridRowSelectionModel = {
+  type: "include",
+  ids: new Set(),
+};
+
+// The DataGrid's "select all" header checkbox can produce an "exclude" model
+// even under server-side pagination; either way this only ever resolves
+// against the currently-loaded page's rows, so "exclude" here always means
+// "everything on this page except these."
+function resolveSelectedOrders(
+  model: GridRowSelectionModel,
+  rows: Order[],
+): Order[] {
+  return model.type === "include"
+    ? rows.filter((order) => model.ids.has(order.orderCode))
+    : rows.filter((order) => !model.ids.has(order.orderCode));
+}
 
 export function OrdersView() {
   const { notify } = useNotification();
@@ -61,6 +83,9 @@ export function OrdersView() {
     code: string | null;
     open: boolean;
   }>({ code: null, open: false });
+  const [selectionModel, setSelectionModel] =
+    useState<GridRowSelectionModel>(EMPTY_SELECTION);
+  const [printOpen, setPrintOpen] = useState(false);
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [samplePictureFilePreview, setSamplePictureFilePreview] = useState<
     string[]
@@ -114,6 +139,22 @@ export function OrdersView() {
       prev.page === 0 ? prev : { ...prev, page: 0 },
     );
   }, []);
+
+  const selectedOrders = useMemo(
+    () => resolveSelectedOrders(selectionModel, orders),
+    [selectionModel, orders],
+  );
+
+  // Selection is page-scoped: switching pages resets it rather than silently
+  // carrying picks that are no longer visible, so the toolbar's count always
+  // matches what will actually print.
+  const handlePaginationModelChange = useCallback(
+    (model: GridPaginationModel) => {
+      setPaginationModel(model);
+      setSelectionModel(EMPTY_SELECTION);
+    },
+    [],
+  );
 
   const handleCreateOrder = useCallback(
     async (payload: CreateOrderPayload) => {
@@ -178,17 +219,20 @@ export function OrdersView() {
           filters={filters}
           onFiltersChange={handleFiltersChange}
           onExport={() => notify("Đang xuất Excel", "info")}
-          onPrint={() => notify("Đang chuẩn bị in", "info")}
+          onPrint={() => setPrintOpen(true)}
           onNewOrder={() => {
             setCreateInitial(createEmptyOrderFormValues());
             setCreateOpen(true);
           }}
+          selectedCount={selectedOrders.length}
         />
         <OrdersTable
           orders={orders}
           rowCount={rowCount}
           paginationModel={paginationModel}
-          onPaginationModelChange={setPaginationModel}
+          onPaginationModelChange={handlePaginationModelChange}
+          rowSelectionModel={selectionModel}
+          onRowSelectionModelChange={setSelectionModel}
           loading={loading}
           onImageClick={handleImageClick}
           onStatusChange={changeStatus}
@@ -196,6 +240,11 @@ export function OrdersView() {
           pendingCodes={pendingCodes}
         />
       </Stack>
+      <PrintOrdersDialog
+        open={printOpen}
+        onClose={() => setPrintOpen(false)}
+        orders={selectedOrders}
+      />
       <SliceImages
         open={galleryOpen}
         images={samplePictureFilePreview}
