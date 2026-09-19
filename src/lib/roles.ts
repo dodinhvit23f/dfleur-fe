@@ -12,3 +12,7 @@ export function getRoleHomeRoute(roles: string[]): string {
   }
   return DEFAULT_ROLE_ROUTE;
 }
+
+export function hasAnyRole(roles: string[], candidates: string[]): boolean {
+  return roles.some((role) => candidates.includes(role));
+}

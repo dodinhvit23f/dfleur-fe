@@ -1,8 +1,9 @@
 "use client";
 
 import { Box, Button, CircularProgress, Typography } from "@mui/material";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { getAccount } from "@/lib/storage";
+import { useNotification } from "@/providers/NotificationProvider";
 import { OrderForm } from "./OrderForm";
 import { OrderFormModal } from "./OrderFormModal";
 import { orderToFormValues } from "./orderForm";
@@ -20,6 +21,9 @@ interface SaveProps {
   saveOrder: (payload: UpdateOrderPayload) => Promise<void>;
   /** Put a freshly fetched copy of the order into the list. */
   syncOrder: (order: Order) => void;
+  /** An SSE ORDER_UPDATED for this same order, arrived while the modal is open. */
+  externalUpdate?: (Order & { actor: string }) | null;
+  onExternalUpdateConsumed?: () => void;
 }
 
 interface ContentProps extends SaveProps {
@@ -37,37 +41,57 @@ function OrderUpdateContent({
   floristOptions,
   saveOrder,
   syncOrder,
+  externalUpdate,
+  onExternalUpdateConsumed,
 }: ContentProps) {
+  const { notify } = useNotification();
   const { order, failed, loading, reload } = useOrderDetail(code);
+  // An SSE-delivered fresh copy takes over from the loaded `order` as the
+  // form's source, without a network round-trip (the SSE payload already IS
+  // the fresh order).
+  const [freshFromSse, setFreshFromSse] = useState<Order | null>(null);
+  const activeOrder = freshFromSse ?? order;
   const initialValues = useMemo(
-    () => (order ? orderToFormValues(order) : null),
-    [order],
+    () => (activeOrder ? orderToFormValues(activeOrder) : null),
+    [activeOrder],
   );
+
+  useEffect(() => {
+    if (!externalUpdate || externalUpdate.orderCode !== code) return;
+    syncOrder(externalUpdate);
+    setFreshFromSse(externalUpdate);
+    notify(`Đơn hàng vừa được cập nhật bởi ${externalUpdate.actor}`, "warning");
+    onExternalUpdateConsumed?.();
+  }, [externalUpdate, code, syncOrder, notify, onExternalUpdateConsumed]);
 
   const handleSubmit = useCallback(
     async (payload: CreateOrderPayload) => {
-      if (!order) return;
+      if (!activeOrder) return;
       await saveOrder({
         ...payload,
         // The create payload omits an empty florist; an edit must clear it.
         floristAccount: payload.floristAccount ?? "",
-        orderCode: order.orderCode,
-        version: order.version,
-        status: order.status,
+        orderCode: activeOrder.orderCode,
+        version: activeOrder.version,
+        status: activeOrder.status,
         editor: getAccount(),
       });
     },
-    [order, saveOrder],
+    [activeOrder, saveOrder],
   );
 
   // Someone else saved first: reload; the form rebases the user's draft onto
-  // the fresh copy and the list row is refreshed too.
+  // the fresh copy and the list row is refreshed too. The reload is more
+  // authoritative than any earlier SSE copy, so it takes over.
   const handleStale = useCallback(async () => {
     const fresh = await reload();
-    if (fresh) syncOrder(fresh);
+    if (fresh) {
+      syncOrder(fresh);
+      setFreshFromSse(null);
+    }
   }, [reload, syncOrder]);
 
-  if (!order || !initialValues) {
+  if (!activeOrder || !initialValues) {
     return (
       <Box
         sx={{

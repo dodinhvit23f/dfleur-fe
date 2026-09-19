@@ -4,7 +4,11 @@ import {
   hasSocialLink,
   type Order,
   parseOrderDate,
+  splitAccounts,
 } from "./orderUtils";
+
+// Re-exported for existing callers of this module.
+export { splitAccounts } from "./orderUtils";
 
 // ---------------------------------------------------------------------------
 // Order form domain: values, totals, validation, mapping to/from the API model.
@@ -158,14 +162,6 @@ const numberFormatter = new Intl.NumberFormat("vi-VN");
 export function formatMoneyInput(raw: string): string {
   const digits = toDigits(raw);
   return digits === "" ? "" : numberFormatter.format(Number(digits));
-}
-
-/** "a, b" <-> ["a", "b"]: staff accounts travel comma-joined on the wire. */
-export function splitAccounts(raw: string | null | undefined): string[] {
-  return (raw ?? "")
-    .split(",")
-    .map((account) => account.trim())
-    .filter(Boolean);
 }
 
 export interface OrderTotals {

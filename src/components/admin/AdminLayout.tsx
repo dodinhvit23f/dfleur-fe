@@ -14,6 +14,8 @@ import { alpha, useTheme } from "@mui/material/styles";
 import type { ReactNode } from "react";
 import { useState } from "react";
 import { AdminSidebar } from "./AdminSidebar";
+import { NotificationBell } from "./NotificationBell";
+import { NotificationDrawer } from "./NotificationDrawer";
 
 export const DRAWER_WIDTH = 280;
 const APPBAR_HEIGHT = 72;
@@ -34,6 +36,7 @@ export interface AdminLayoutProps {
 export function AdminLayout({ title, children }: AdminLayoutProps) {
   const theme = useTheme();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
 
   return (
     <Box sx={{ display: "flex", minHeight: "100vh" }}>
@@ -65,11 +68,16 @@ export function AdminLayout({ title, children }: AdminLayoutProps) {
               {title}
             </Typography>
           </Box>
+          <NotificationBell onClick={() => setNotifOpen(true)} />
           <IconButton>
             <PersonOutlineRoundedIcon />
           </IconButton>
         </Toolbar>
       </AppBar>
+      <NotificationDrawer
+        open={notifOpen}
+        onClose={() => setNotifOpen(false)}
+      />
 
       <Box
         component="nav"

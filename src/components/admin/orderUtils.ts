@@ -191,49 +191,105 @@ export function pickNewerOrder(current: Order, incoming: Order): Order {
   return incoming.version >= current.version ? incoming : current;
 }
 
+/** [deliveryStart, deliveryEnd] timestamps — the pair `compareOrdersByDeliveryDesc` sorts by. */
+export type DeliverySortKey = readonly [number, number];
+
 /**
- * Adds `order` and re-sorts by delivery time, newest first. A row with the same
- * code is replaced unless the existing copy has a newer version.
+ * Computed once per order and cached (see `useOrders.ts`'s `sortKeysRef`), so
+ * repeated comparisons during binary-search insertion are plain number
+ * subtractions instead of re-parsing `deliveryDateStart`/`deliveryDateEnd`
+ * (regex + `Date` construction) on every comparison.
  */
-export function insertOrderSorted(orders: Order[], order: Order): Order[] {
-  const existing = orders.find((row) => row.orderCode === order.orderCode);
+export function computeDeliverySortKey(order: Order): DeliverySortKey {
   return [
-    ...orders.filter((row) => row.orderCode !== order.orderCode),
-    existing ? pickNewerOrder(existing, order) : order,
-  ].sort(compareOrdersByDeliveryDesc);
+    deliveryTime(order.deliveryDateStart),
+    deliveryTime(order.deliveryDateEnd),
+  ];
+}
+
+function compareSortKeys(a: DeliverySortKey, b: DeliverySortKey): number {
+  if (a[0] !== b[0]) return b[0] - a[0];
+  return b[1] - a[1];
 }
 
 /**
- * Puts `order` in place of the row with the same `orderCode` (found by code, so
- * it works wherever the row currently sits) and keeps its position. The existing
- * row wins if it has a newer version; an unknown code leaves the list unchanged.
+ * Binary-search insertion index for a code with sort key `key` into `codes`, an
+ * array of order codes already sorted newest-first by `sortKeys`. O(log n)
+ * comparisons; the actual `splice` insertion remains O(n) (a cheap memmove, no
+ * comparator calls) — see `useOrders.ts` for why a plain `indexOf` is used for
+ * removal instead of a symmetric binary search (tie-band ambiguity).
  */
-export function replaceOrderByCode(orders: Order[], order: Order): Order[] {
-  const index = orders.findIndex((row) => row.orderCode === order.orderCode);
-  if (index === -1) return orders;
-  const next = [...orders];
-  next[index] = pickNewerOrder(orders[index], order);
-  return next;
+export function findSortedInsertIndex(
+  codes: readonly string[],
+  key: DeliverySortKey,
+  sortKeys: ReadonlyMap<string, DeliverySortKey>,
+): number {
+  let lo = 0;
+  let hi = codes.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >>> 1;
+    const midKey = sortKeys.get(codes[mid]);
+    const cmp = midKey ? compareSortKeys(midKey, key) : 0;
+    if (cmp <= 0) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo;
 }
 
 /**
- * Merges a fetched page into the rows currently shown, row by row: a row with a
- * mutation in flight (`lockedCodes`) keeps its local copy, otherwise the higher
- * version wins. Order and membership follow the fetched page.
+ * Does `order` still belong in a list filtered by `filters`? Mirrors
+ * `buildOrderQuery`'s server-side semantics as closely as possible, for
+ * deciding whether a live-pushed order (SSE) should be inserted into or
+ * removed from the currently visible page. Best-effort for `search` — the
+ * backend's exact substring-match fields aren't visible from the frontend.
  */
-export function mergeFetchedOrders(
-  local: Order[],
-  fetched: Order[],
-  lockedCodes: ReadonlySet<string>,
-): Order[] {
-  const localByCode = new Map(local.map((row) => [row.orderCode, row]));
-  return fetched.map((row) => {
-    const current = localByCode.get(row.orderCode);
-    if (!current) return row;
-    return lockedCodes.has(row.orderCode)
-      ? current
-      : pickNewerOrder(current, row);
-  });
+export function matchesOrderFilters(
+  order: Order,
+  filters: OrdersFilterState,
+): boolean {
+  if (filters.statuses.length > 0 && !filters.statuses.includes(order.status)) {
+    return false;
+  }
+  if (filters.salers.length > 0) {
+    const orderSalers = splitAccounts(order.saleAccount);
+    if (!orderSalers.some((account) => filters.salers.includes(account))) {
+      return false;
+    }
+  }
+  if (filters.florists.length > 0) {
+    const orderFlorists = splitAccounts(order.floristAccount);
+    if (!orderFlorists.some((account) => filters.florists.includes(account))) {
+      return false;
+    }
+  }
+  if (filters.deliveryStart || filters.deliveryEnd) {
+    const start = parseOrderDate(order.deliveryDateStart).getTime();
+    if (Number.isNaN(start)) return false;
+    if (filters.deliveryStart) {
+      const from = new Date(filters.deliveryStart);
+      from.setHours(0, 0, 0, 0);
+      if (start < from.getTime()) return false;
+    }
+    if (filters.deliveryEnd) {
+      const to = new Date(filters.deliveryEnd);
+      to.setHours(23, 59, 59, 999);
+      if (start > to.getTime()) return false;
+    }
+  }
+  if (filters.search.trim() !== "") {
+    const needle = filters.search.trim().toLowerCase();
+    const haystack = [
+      order.orderCode,
+      order.customerName,
+      order.customerPhone,
+      order.receiverName,
+      order.receiverPhone,
+    ]
+      .join(" ")
+      .toLowerCase();
+    if (!haystack.includes(needle)) return false;
+  }
+  return true;
 }
 
 export interface DeliveryWindow {
@@ -312,6 +368,14 @@ export function getExtraCustomerContact(order: Order): string | null {
   if (samePerson) return null;
 
   return formatContact(name, phone);
+}
+
+/** "a, b" <-> ["a", "b"]: staff accounts travel comma-joined on the wire. */
+export function splitAccounts(raw: string | null | undefined): string[] {
+  return (raw ?? "")
+    .split(",")
+    .map((account) => account.trim())
+    .filter(Boolean);
 }
 
 export function hasSocialLink(socialLink: string | undefined): boolean {

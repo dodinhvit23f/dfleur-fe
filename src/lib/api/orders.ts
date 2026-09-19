@@ -96,7 +96,7 @@ function normalizeSocialLink(link: string | null | undefined): string {
   return "None";
 }
 
-function normalizeOrder(raw: Order): Order {
+export function normalizeOrder(raw: Order): Order {
   return {
     ...raw,
     status: fromApiStatus(raw.status),
@@ -126,18 +126,34 @@ export const getOrders = async (
   };
 };
 
+export interface OrderApiResult {
+  order: Order;
+  /**
+   * The backend's own trace ID for this mutation, echoed on its response body.
+   * A client-generated `X-Trace-Id` was tried and confirmed NOT honored by the
+   * backend (it generates its own regardless of what's sent), so this is the
+   * only ID that can correlate with the mutation's own SSE echo — see
+   * `OrderNotificationProvider`'s `claimTraceId`.
+   */
+  traceId?: string;
+}
+
 export const createOrderApi = async (
   payload: CreateOrderPayload,
-): Promise<Order> => {
+): Promise<OrderApiResult> => {
   const url = requireEnv(
     "NEXT_PUBLIC_API_ADMIN_ORDER_CREATE",
     process.env.NEXT_PUBLIC_API_ADMIN_ORDER_CREATE,
   );
-  const response = await postJson<{ data: Order }>(url, payload, {
-    authorization: bearer(),
-    fallbackErrorCode: "ORDER_CREATE_FAILED",
-  });
-  return normalizeOrder(response.data);
+  const response = await postJson<{ data: Order; traceId?: string }>(
+    url,
+    payload,
+    {
+      authorization: bearer(),
+      fallbackErrorCode: "ORDER_CREATE_FAILED",
+    },
+  );
+  return { order: normalizeOrder(response.data), traceId: response.traceId };
 };
 
 /** Loads one order (fresh `version` included) for the edit form. */
@@ -162,32 +178,42 @@ export const getOrderDetail = async (code: string): Promise<Order> => {
  */
 export const updateOrderApi = async (
   payload: UpdateOrderPayload,
-): Promise<Order> => {
+): Promise<OrderApiResult> => {
   const url = requireEnv(
     "NEXT_PUBLIC_API_ADMIN_ORDER_UPDATE",
     process.env.NEXT_PUBLIC_API_ADMIN_ORDER_UPDATE,
   );
-  const response = await putJson<{ data?: Order }>(
+  const response = await putJson<{ data?: Order; traceId?: string }>(
     url,
     { ...payload, status: toApiStatus(payload.status) },
     { authorization: bearer(), fallbackErrorCode: "ORDER_UPDATE_FAILED" },
   );
   const { editor: _editor, ...sent } = payload;
-  return normalizeOrder(response?.data?.orderCode ? response.data : sent);
+  return {
+    order: normalizeOrder(response?.data?.orderCode ? response.data : sent),
+    traceId: response.traceId,
+  };
 };
 
+/**
+ * Status-only changes emit their own `ORDER_UPDATED` SSE echo too (confirmed —
+ * this endpoint previously discarded its whole response body via `Promise<void>`
+ * and never claimed a trace ID, so every status change unconditionally
+ * double-toasted; that was the concrete bug this fixes).
+ */
 export const updateOrderStatusApi = async (
   update: OrderStatusUpdate,
-): Promise<void> => {
+): Promise<{ traceId?: string }> => {
   const url = requireEnv(
     "NEXT_PUBLIC_API_ADMIN_ORDER_STATUS",
     process.env.NEXT_PUBLIC_API_ADMIN_ORDER_STATUS,
   );
-  await putJson<unknown>(
+  const response = await putJson<{ traceId?: string }>(
     url,
     { ...update, status: toApiStatus(update.status) },
     { authorization: bearer(), fallbackErrorCode: "ORDER_STATUS_FAILED" },
   );
+  return { traceId: response?.traceId };
 };
 
 // Fails soft (empty list) so a broken staff endpoint only empties the dropdown.

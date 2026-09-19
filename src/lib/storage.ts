@@ -6,6 +6,7 @@ export const STORAGE_KEYS = {
   TENANT: "tenant",
   ACCOUNT: "account",
   TIER_DATA: "tierData",
+  NOTIFICATIONS: "notifications",
 } as const;
 
 export function getTenant(): string {
@@ -63,7 +64,9 @@ export function clearSession(): void {
   localStorage.removeItem(STORAGE_KEYS.OTP_TOKEN);
 }
 
-// Full logout / invalid-session wipe, including TENANT and TIER_DATA.
+// Full logout / invalid-session wipe, including TENANT and TIER_DATA. Also
+// clears NOTIFICATIONS so a different user logging in on the same browser
+// doesn't see the previous tenant's order notifications.
 export function clearAuthStorage(): void {
   localStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN);
   localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
@@ -72,4 +75,5 @@ export function clearAuthStorage(): void {
   localStorage.removeItem(STORAGE_KEYS.OTP_TOKEN);
   localStorage.removeItem(STORAGE_KEYS.TENANT);
   localStorage.removeItem(STORAGE_KEYS.TIER_DATA);
+  localStorage.removeItem(STORAGE_KEYS.NOTIFICATIONS);
 }

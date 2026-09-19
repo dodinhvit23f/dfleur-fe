@@ -9,6 +9,7 @@ import {
   type OrderListParams,
 } from "@/lib/api/orders";
 import { useNotification } from "@/providers/NotificationProvider";
+import { useOrderNotifications } from "@/providers/OrderNotificationProvider";
 import { ADMIN_CONTENT_CHROME, AdminLayout } from "./AdminLayout";
 import { OrderForm } from "./OrderForm";
 import { OrderFormModal } from "./OrderFormModal";
@@ -19,6 +20,7 @@ import { createEmptyOrderFormValues } from "./orderForm";
 import {
   type CreateOrderPayload,
   emptyOrdersFilterState,
+  type Order,
   type OrdersFilterState,
 } from "./orderUtils";
 import { SliceImages } from "./SliceImages";
@@ -28,6 +30,8 @@ import { useStaffOptions } from "./useStaffOptions";
 export function OrdersView() {
   const { notify } = useNotification();
   const { saleOptions, floristOptions } = useStaffOptions();
+  const { subscribe, subscribeReconnect, claimTraceId } =
+    useOrderNotifications();
   const {
     orders,
     rowCount,
@@ -39,7 +43,9 @@ export function OrdersView() {
     syncOrder,
     saveOrder,
     changeStatus,
-  } = useOrders();
+    applyOrderEvents,
+    setEditingCode,
+  } = useOrders(claimTraceId);
   const [filters, setFilters] = useState(emptyOrdersFilterState);
   const [paginationModel, setPaginationModel] = useState<GridPaginationModel>({
     page: 0,
@@ -59,6 +65,16 @@ export function OrdersView() {
   const [samplePictureFilePreview, setSamplePictureFilePreview] = useState<
     string[]
   >([]);
+  // An SSE ORDER_UPDATED for the order currently open in the edit modal —
+  // handed to OrderUpdateModal so it can rebase the user's in-progress draft
+  // instead of the background row silently changing underneath them.
+  const [externalUpdate, setExternalUpdate] = useState<
+    (Order & { actor: string }) | null
+  >(null);
+
+  useEffect(() => {
+    setEditingCode(editing.open ? editing.code : null);
+  }, [editing, setEditingCode]);
 
   const params = useMemo<OrderListParams>(
     () => ({
@@ -101,13 +117,41 @@ export function OrdersView() {
 
   const handleCreateOrder = useCallback(
     async (payload: CreateOrderPayload) => {
-      const created = await createOrderApi(payload);
+      const { order: created, traceId } = await createOrderApi(payload);
+      if (traceId) claimTraceId(traceId);
       // No list call: put the created order straight into the rows. If the
       // response isn't a usable order, fall back to reloading the list.
       if (created?.orderCode) addOrder(created);
       else await refresh();
     },
-    [addOrder, refresh],
+    [addOrder, refresh, claimTraceId],
+  );
+
+  // Live order events (batched, length 1 in the common case) -> local state.
+  const filtersRef = useRef(filters);
+  filtersRef.current = filters;
+  useEffect(
+    () =>
+      subscribe((events) => {
+        applyOrderEvents(events, filtersRef.current);
+        const relevant = events.find(
+          (e) =>
+            e.eventType === "ORDER_UPDATED" &&
+            editing.open &&
+            editing.code === e.order.orderCode,
+        );
+        if (relevant) {
+          setExternalUpdate({ ...relevant.order, actor: relevant.actor });
+        }
+      }),
+    [subscribe, applyOrderEvents, editing.open, editing.code],
+  );
+
+  // No replay on the backend: every reconnect after the first may have missed
+  // events, so refetch the current page.
+  useEffect(
+    () => subscribeReconnect(() => void refresh()),
+    [subscribeReconnect, refresh],
   );
 
   const handleImageClick = useCallback((links: string[]) => {
@@ -187,6 +231,8 @@ export function OrdersView() {
         floristOptions={floristOptions}
         saveOrder={saveOrder}
         syncOrder={syncOrder}
+        externalUpdate={externalUpdate}
+        onExternalUpdateConsumed={() => setExternalUpdate(null)}
       />
     </AdminLayout>
   );
